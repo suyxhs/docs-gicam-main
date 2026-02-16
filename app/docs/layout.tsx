@@ -9,7 +9,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       tree={source.pageTree}
       nav={{
         title: 'Gicam Dock',
-        githubUrl: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,
+        // githubUrl нужно передавать отдельно или через компонент
       }}
       links={[
         {
@@ -18,8 +18,14 @@ export default function Layout({ children }: { children: ReactNode }) {
           active: 'nested-url',
         },
         {
-          text: 'Админ',
-          url: '/admin',
+          text: 'Портфолио',
+          url: '/portfolio',
+        },
+        // Ссылка на GitHub как отдельный элемент
+        {
+          text: 'GitHub',
+          url: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,
+          external: true,
         },
       ]}
     >
