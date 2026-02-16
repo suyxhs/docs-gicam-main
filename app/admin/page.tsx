@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { FolderNavigation } from "@/components/admin/folder-navigation";
 import { MediaManager } from "@/components/admin/media-manager";
+import { VersionHistory } from "@/components/admin/version-history";
+import { BulkOperations } from "@/components/admin/bulk-operations";
+import { TocGenerator } from "@/components/admin/toc-generator";
 import "./editor.css";
 
 // Динамический импорт MarkdownEditor
@@ -71,6 +74,12 @@ export default function AdminPage() {
   const [isMobile, setIsMobile] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showMediaManager, setShowMediaManager] = useState(false);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [showBulkOperations, setShowBulkOperations] = useState(false);
+  const [showTocGenerator, setShowTocGenerator] = useState(false);
+  const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
   const [analytics, setAnalytics] = useState<AnalyticsData>({
     totalDocs: 0,
     totalFolders: 0,
@@ -114,6 +123,40 @@ export default function AdminPage() {
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, [showTemplates]);
+
+  // Блокировка скролла body в полноэкранном режиме и при открытых модальных окнах
+  useEffect(() => {
+    if (isFullscreen || showSaveModal || showVersionHistory || showMediaManager || showBulkOperations || showTocGenerator) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isFullscreen, showSaveModal, showVersionHistory, showMediaManager, showBulkOperations, showTocGenerator]);
+
+  // Глобальные горячие клавиши (только сохранение и ESC)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + S для сохранения (только когда открыт редактор)
+      if ((e.metaKey || e.ctrlKey) && e.key === 's' && selected) {
+        e.preventDefault();
+        saveFile();
+      }
+      // Esc для закрытия модалок
+      if (e.key === 'Escape') {
+        setShowVersionHistory(false);
+        setShowMediaManager(false);
+        setShowTemplates(false);
+        setShowBulkOperations(false);
+        setShowTocGenerator(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selected]);
 
   // Загрузка списка документов и папок
   const loadDocs = async (folder = currentFolder) => {
@@ -216,29 +259,44 @@ export default function AdminPage() {
     setIsSaving(true);
     
     try {
+      const pathParts = selected.split('/');
+      const filename = pathParts.pop() || '';
+      const folder = pathParts.join('/');
+      
       const response = await fetch("/api/docs", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          filename: selected.split('/').pop(),
+          filename,
           title,
           description,
           content,
-          folder: currentFolder,
+          folder,
         }),
       });
       
       if (!response.ok) throw new Error();
       
       await loadDocs();
+      setShowSaveModal(true);
       
     } catch (error) {
       alert("Ошибка при сохранении");
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Закрыть модальное окно и вернуться к аналитике
+  const handleCloseSaveModal = () => {
+    setShowSaveModal(false);
+    setSelected("");
+    setTitle("");
+    setDescription("");
+    setContent("");
+    if (isFullscreen) setIsFullscreen(false);
   };
 
   // Создание нового файла
@@ -286,9 +344,7 @@ export default function AdminPage() {
   // Удаление папки
   const deleteFolder = async (folder: string) => {
     try {
-      const fullPath = currentFolder ? `${currentFolder}/${folder}` : folder;
-      
-      const response = await fetch(`/api/docs/folder?folder=${encodeURIComponent(fullPath)}`, {
+      const response = await fetch(`/api/docs/folder?folder=${encodeURIComponent(folder)}`, {
         method: "DELETE",
       });
       
@@ -346,6 +402,57 @@ export default function AdminPage() {
     handleFolderClick(parent);
   };
 
+  // Восстановление версии
+  const handleRestoreVersion = (versionId: string) => {
+    alert(`Восстановление версии ${versionId}`);
+    setShowVersionHistory(false);
+  };
+
+  // Массовое перемещение
+  const handleBulkMove = async (targetFolder: string, docs: string[]) => {
+    console.log(`Перемещение ${docs.length} документов в ${targetFolder || 'корень'}`);
+    
+    // Здесь будет логика перемещения через API
+    for (const doc of docs) {
+      console.log(`Перемещение ${doc} -> ${targetFolder}`);
+    }
+    
+    alert(`Перемещение ${docs.length} документов выполнено`);
+    setShowBulkOperations(false);
+    setSelectedDocs([]);
+  };
+
+  // Массовое удаление
+  const handleBulkDelete = async (docs: string[]) => {
+    if (confirm(`Удалить ${docs.length} документов?`)) {
+      console.log(`Удаление ${docs.length} документов`);
+      
+      // Здесь будет логика удаления через API
+      for (const doc of docs) {
+        console.log(`Удаление ${doc}`);
+      }
+      
+      alert(`Удаление ${docs.length} документов выполнено`);
+      setShowBulkOperations(false);
+      setSelectedDocs([]);
+    }
+  };
+
+  // Массовый экспорт
+  const handleBulkExport = async (docs: string[]) => {
+    console.log(`Экспорт ${docs.length} документов в ZIP`);
+    
+    // Здесь будет логика экспорта через API
+    alert(`Экспорт ${docs.length} документов начат`);
+    setShowBulkOperations(false);
+  };
+
+  // Вставка оглавления
+  const handleInsertToc = (toc: string) => {
+    setContent(toc + '\n\n' + content);
+    setShowTocGenerator(false);
+  };
+
   // Фильтрация документов
   const filteredFiles = files.filter(doc => 
     doc.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -399,6 +506,10 @@ export default function AdminPage() {
     );
   };
 
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
@@ -432,6 +543,7 @@ export default function AdminPage() {
         border-r border-black/10 dark:border-white/10
         flex flex-col
         shrink-0
+        ${isFullscreen ? 'hidden' : ''}
       `}>
         {/* Хедер сайдбара */}
         <div className="p-6 border-b border-black/10 dark:border-white/10">
@@ -450,6 +562,30 @@ export default function AdminPage() {
               className="md:hidden w-8 h-8 flex items-center justify-center text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
             >
               ✕
+            </button>
+          </div>
+
+          {/* Новые кнопки действий */}
+          <div className="mt-4 space-y-2">
+            <button
+              onClick={() => {
+                // Собираем все пути документов для массовых операций
+                const allDocs = files.map(f => f.path);
+                setSelectedDocs(allDocs.slice(0, 10)); // Для демо берем первые 10
+                setShowBulkOperations(true);
+              }}
+              className="w-full px-4 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg text-sm transition-colors flex items-center gap-2"
+            >
+              <span>📦</span>
+              <span>Массовые операции</span>
+            </button>
+            
+            <button
+              onClick={() => setShowVersionHistory(true)}
+              className="w-full px-4 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg text-sm transition-colors flex items-center gap-2"
+            >
+              <span>📋</span>
+              <span>История изменений</span>
             </button>
           </div>
         </div>
@@ -554,40 +690,45 @@ export default function AdminPage() {
       </div>
 
       {/* Основная область */}
-      <div className="flex-1 overflow-y-auto">
+      <div className={`flex-1 overflow-y-auto transition-all duration-300 ${
+        isFullscreen 
+          ? 'fixed inset-0 z-[100] bg-gradient-to-br from-gray-50 to-white dark:from-gray-950 dark:to-black' 
+          : ''
+      }`}>
         {/* Мобильная шапка */}
-        <div className="md:hidden sticky top-0 bg-white/80 dark:bg-black/80 backdrop-blur-xl border-b border-black/10 dark:border-white/10 p-3 z-10">
-          <div className="flex items-center justify-between">
-            {/* Левая часть - шаблоны */}
-            <div className="relative templates-menu">
-              <button
-                onClick={() => setShowTemplates(!showTemplates)}
-                className="w-10 h-10 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-colors"
-                title="Быстрые шаблоны"
-              >
-                <span className="text-xl">⚡️</span>
-              </button>
+        {!isFullscreen && (
+          <div className="md:hidden sticky top-0 bg-white/80 dark:bg-black/80 backdrop-blur-xl border-b border-black/10 dark:border-white/10 p-3 z-10">
+            <div className="flex items-center justify-between">
+              {/* Левая часть - шаблоны */}
+              <div className="relative templates-menu">
+                <button
+                  onClick={() => setShowTemplates(!showTemplates)}
+                  className="w-10 h-10 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-colors"
+                  title="Быстрые шаблоны"
+                >
+                  <span className="text-xl">⚡️</span>
+                </button>
 
-              {/* Выпадающее меню шаблонов для мобильных */}
-              {showTemplates && (
-                <div className="absolute left-0 top-12 w-64 bg-white dark:bg-black/90 backdrop-blur-xl border border-black/10 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 animate-fadeIn">
-                  <div className="p-3 border-b border-black/10 dark:border-white/10">
-                    <h3 className="text-xs font-medium text-black/60 dark:text-white/60">
-                      Быстрые шаблоны
-                    </h3>
-                  </div>
-                  
-                  <div className="p-2 max-h-96 overflow-y-auto">
-                    {/* API Документация */}
-                    <button
-                      onClick={() => {
-                        const fileName = prompt("Введите имя файла:", "api-docs.mdx");
-                        if (fileName) {
-                          const fullPath = currentFolder ? `${currentFolder}/${fileName}` : fileName;
-                          setSelected(fullPath);
-                          setTitle("API Документация");
-                          setDescription("Описание API эндпоинтов");
-                          setContent(`# API Документация
+                {/* Выпадающее меню шаблонов для мобильных */}
+                {showTemplates && (
+                  <div className="absolute left-0 top-12 w-64 bg-white dark:bg-black/90 backdrop-blur-xl border border-black/10 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 animate-fadeIn">
+                    <div className="p-3 border-b border-black/10 dark:border-white/10">
+                      <h3 className="text-xs font-medium text-black/60 dark:text-white/60">
+                        Быстрые шаблоны
+                      </h3>
+                    </div>
+                    
+                    <div className="p-2 max-h-96 overflow-y-auto">
+                      {/* API Документация */}
+                      <button
+                        onClick={() => {
+                          const fileName = prompt("Введите имя файла:", "api-docs.mdx");
+                          if (fileName) {
+                            const fullPath = currentFolder ? `${currentFolder}/${fileName}` : fileName;
+                            setSelected(fullPath);
+                            setTitle("API Документация");
+                            setDescription("Описание API эндпоинтов");
+                            setContent(`# API Документация
 
 ## Базовый URL
 \`\`\`
@@ -639,28 +780,28 @@ Authorization: Bearer YOUR_API_KEY
 }
 \`\`\`
 `);
-                          setShowTemplates(false);
-                        }
-                      }}
-                      className="w-full text-left px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors text-sm flex items-center gap-2"
-                    >
-                      <span className="text-lg">📡</span>
-                      <div>
-                        <p className="font-medium text-black/80 dark:text-white/80">API Документация</p>
-                        <p className="text-xs text-black/40 dark:text-white/40">Шаблон для описания API</p>
-                      </div>
-                    </button>
+                            setShowTemplates(false);
+                          }
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors text-sm flex items-center gap-2"
+                      >
+                        <span className="text-lg">📡</span>
+                        <div>
+                          <p className="font-medium text-black/80 dark:text-white/80">API Документация</p>
+                          <p className="text-xs text-black/40 dark:text-white/40">Шаблон для описания API</p>
+                        </div>
+                      </button>
 
-                    {/* Руководство */}
-                    <button
-                      onClick={() => {
-                        const fileName = prompt("Введите имя файла:", "guide.mdx");
-                        if (fileName) {
-                          const fullPath = currentFolder ? `${currentFolder}/${fileName}` : fileName;
-                          setSelected(fullPath);
-                          setTitle("Руководство пользователя");
-                          setDescription("Пошаговое руководство");
-                          setContent(`# Руководство пользователя
+                      {/* Руководство */}
+                      <button
+                        onClick={() => {
+                          const fileName = prompt("Введите имя файла:", "guide.mdx");
+                          if (fileName) {
+                            const fullPath = currentFolder ? `${currentFolder}/${fileName}` : fileName;
+                            setSelected(fullPath);
+                            setTitle("Руководство пользователя");
+                            setDescription("Пошаговое руководство");
+                            setContent(`# Руководство пользователя
 
 ## Введение
 Добро пожаловать в руководство пользователя. Здесь вы найдете всю необходимую информацию для работы с системой.
@@ -700,28 +841,28 @@ Authorization: Bearer YOUR_API_KEY
 **Вопрос:** Как связаться с поддержкой?
 **Ответ:** Напишите на support@example.com
 `);
-                          setShowTemplates(false);
-                        }
-                      }}
-                      className="w-full text-left px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors text-sm flex items-center gap-2 mt-1"
-                    >
-                      <span className="text-lg">📖</span>
-                      <div>
-                        <p className="font-medium text-black/80 dark:text-white/80">Руководство</p>
-                        <p className="text-xs text-black/40 dark:text-white/40">Пошаговое руководство</p>
-                      </div>
-                    </button>
+                            setShowTemplates(false);
+                          }
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors text-sm flex items-center gap-2 mt-1"
+                      >
+                        <span className="text-lg">📖</span>
+                        <div>
+                          <p className="font-medium text-black/80 dark:text-white/80">Руководство</p>
+                          <p className="text-xs text-black/40 dark:text-white/40">Пошаговое руководство</p>
+                        </div>
+                      </button>
 
-                    {/* README */}
-                    <button
-                      onClick={() => {
-                        const fileName = prompt("Введите имя файла:", "README.mdx");
-                        if (fileName) {
-                          const fullPath = currentFolder ? `${currentFolder}/${fileName}` : fileName;
-                          setSelected(fullPath);
-                          setTitle("README");
-                          setDescription("Описание проекта");
-                          setContent(`# Название проекта
+                      {/* README */}
+                      <button
+                        onClick={() => {
+                          const fileName = prompt("Введите имя файла:", "README.mdx");
+                          if (fileName) {
+                            const fullPath = currentFolder ? `${currentFolder}/${fileName}` : fileName;
+                            setSelected(fullPath);
+                            setTitle("README");
+                            setDescription("Описание проекта");
+                            setContent(`# Название проекта
 
 Краткое описание проекта, его цели и задачи.
 
@@ -787,28 +928,28 @@ npm run dev
 
 MIT
 `);
-                          setShowTemplates(false);
-                        }
-                      }}
-                      className="w-full text-left px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors text-sm flex items-center gap-2 mt-1"
-                    >
-                      <span className="text-lg">📝</span>
-                      <div>
-                        <p className="font-medium text-black/80 dark:text-white/80">README</p>
-                        <p className="text-xs text-black/40 dark:text-white/40">Описание проекта</p>
-                      </div>
-                    </button>
+                            setShowTemplates(false);
+                          }
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors text-sm flex items-center gap-2 mt-1"
+                      >
+                        <span className="text-lg">📝</span>
+                        <div>
+                          <p className="font-medium text-black/80 dark:text-white/80">README</p>
+                          <p className="text-xs text-black/40 dark:text-white/40">Описание проекта</p>
+                        </div>
+                      </button>
 
-                    {/* Changelog */}
-                    <button
-                      onClick={() => {
-                        const fileName = prompt("Введите имя файла:", "changelog.mdx");
-                        if (fileName) {
-                          const fullPath = currentFolder ? `${currentFolder}/${fileName}` : fileName;
-                          setSelected(fullPath);
-                          setTitle("Changelog");
-                          setDescription("История изменений");
-                          setContent(`# Changelog
+                      {/* Changelog */}
+                      <button
+                        onClick={() => {
+                          const fileName = prompt("Введите имя файла:", "changelog.mdx");
+                          if (fileName) {
+                            const fullPath = currentFolder ? `${currentFolder}/${fileName}` : fileName;
+                            setSelected(fullPath);
+                            setTitle("Changelog");
+                            setDescription("История изменений");
+                            setContent(`# Changelog
 
 Все заметные изменения в проекте будут документироваться в этом файле.
 
@@ -841,117 +982,222 @@ MIT
 - Базовая конфигурация
 - Документация
 `);
-                          setShowTemplates(false);
-                        }
-                      }}
-                      className="w-full text-left px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors text-sm flex items-center gap-2 mt-1"
+                            setShowTemplates(false);
+                          }
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors text-sm flex items-center gap-2 mt-1"
+                      >
+                        <span className="text-lg">📋</span>
+                        <div>
+                          <p className="font-medium text-black/80 dark:text-white/80">Changelog</p>
+                          <p className="text-xs text-black/40 dark:text-white/40">История изменений</p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Центр - логотип */}
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-gradient-to-br from-black/80 to-black dark:from-white/80 dark:to-white rounded-xl flex items-center justify-center">
+                  <span className="text-white dark:text-black text-sm font-bold">G</span>
+                </div>
+                <span className="text-sm font-medium text-black/80 dark:text-white/80">
+                  Gicam Dock
+                </span>
+              </div>
+
+              {/* Правая часть - кнопка открытия сайдбара */}
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="w-10 h-10 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-colors"
+              >
+                <span className="text-xl">☰</span>
+              </button>
+            </div>
+
+            {/* Хлебные крошки */}
+            {breadcrumbs.length > 0 && (
+              <div className="flex items-center gap-1 mt-2 px-2 text-xs">
+                <span className="text-black/40 dark:text-white/40">📁</span>
+                {breadcrumbs.map((crumb, index) => (
+                  <div key={crumb} className="flex items-center gap-1">
+                    {index > 0 && <span className="text-black/20 dark:text-white/20">/</span>}
+                    <button
+                      onClick={() => handleFolderClick(breadcrumbs.slice(0, index + 1).join('/'))}
+                      className="text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
                     >
-                      <span className="text-lg">📋</span>
-                      <div>
-                        <p className="font-medium text-black/80 dark:text-white/80">Changelog</p>
-                        <p className="text-xs text-black/40 dark:text-white/40">История изменений</p>
-                      </div>
+                      {crumb}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Контент */}
+        <div className={`${isFullscreen ? 'h-screen p-8' : 'p-6 md:p-8 lg:p-10'}`}>
+          {selected ? (
+            // Режим редактирования
+            <div className={`${isFullscreen ? 'h-full max-w-7xl mx-auto' : 'max-w-4xl mx-auto space-y-6'}`}>
+              {!isFullscreen && (
+                <div>
+                  <h1 className="text-2xl font-light text-black/80 dark:text-white/80 mb-1">
+                    Редактирование
+                  </h1>
+                  <p className="text-sm text-black/40 dark:text-white/40">
+                    {selected}
+                  </p>
+                </div>
+              )}
+
+              {/* Полноэкранная шапка */}
+              {isFullscreen && (
+                <div className="flex items-center justify-between mb-6 pb-4 border-b border-black/10 dark:border-white/10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-black/5 dark:bg-white/5 rounded-xl flex items-center justify-center">
+                      <span className="text-xl">📝</span>
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-medium text-black/80 dark:text-white/80">
+                        {selected}
+                      </h2>
+                      <p className="text-xs text-black/40 dark:text-white/40">
+                        Редактирование документа
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowMediaManager(true)}
+                      className="px-4 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-xl text-sm transition-colors flex items-center gap-2"
+                    >
+                      <span>🖼️</span>
+                      <span className="hidden sm:inline">Медиа</span>
+                    </button>
+                    <button
+                      onClick={() => setShowVersionHistory(true)}
+                      className="px-4 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-xl text-sm transition-colors flex items-center gap-2"
+                    >
+                      <span>📋</span>
+                      <span className="hidden sm:inline">История</span>
+                    </button>
+                    <button
+                      onClick={toggleFullscreen}
+                      className="px-4 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-xl text-sm transition-colors flex items-center gap-2"
+                    >
+                      <span>✕</span>
+                      <span className="hidden sm:inline">Свернуть</span>
                     </button>
                   </div>
                 </div>
               )}
-            </div>
 
-            {/* Центр - логотип */}
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-black/80 to-black dark:from-white/80 dark:to-white rounded-xl flex items-center justify-center">
-                <span className="text-white dark:text-black text-sm font-bold">G</span>
-              </div>
-              <span className="text-sm font-medium text-black/80 dark:text-white/80">
-                Gicam Dock
-              </span>
-            </div>
+              <div className={`${isFullscreen ? 'h-[calc(100vh-120px)] flex flex-col' : 'space-y-4'}`}>
+                {!isFullscreen && (
+                  <>
+                    <input
+                      type="text"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Заголовок"
+                      className="w-full px-4 py-3 bg-black/5 dark:bg-white/5 border border-transparent focus:border-black/20 dark:focus:border-white/20 rounded-lg text-lg transition-colors placeholder:text-black/30 dark:placeholder:text-white/30"
+                    />
 
-            {/* Правая часть - кнопка открытия сайдбара */}
-            <button
-              onClick={() => setIsSidebarOpen(true)}
-              className="w-10 h-10 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-colors"
-            >
-              <span className="text-xl">☰</span>
-            </button>
-          </div>
-
-          {/* Хлебные крошки */}
-          {breadcrumbs.length > 0 && (
-            <div className="flex items-center gap-1 mt-2 px-2 text-xs">
-              <span className="text-black/40 dark:text-white/40">📁</span>
-              {breadcrumbs.map((crumb, index) => (
-                <div key={crumb} className="flex items-center gap-1">
-                  {index > 0 && <span className="text-black/20 dark:text-white/20">/</span>}
-                  <button
-                    onClick={() => handleFolderClick(breadcrumbs.slice(0, index + 1).join('/'))}
-                    className="text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
-                  >
-                    {crumb}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Контент */}
-        <div className="p-6 md:p-8 lg:p-10">
-          {selected ? (
-            // Режим редактирования
-            <div className="max-w-4xl mx-auto space-y-6">
-              <div>
-                <h1 className="text-2xl font-light text-black/80 dark:text-white/80 mb-1">
-                  Редактирование
-                </h1>
-                <p className="text-sm text-black/40 dark:text-white/40">
-                  {selected}
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Заголовок"
-                  className="w-full px-4 py-3 bg-black/5 dark:bg-white/5 border border-transparent focus:border-black/20 dark:focus:border-white/20 rounded-lg text-lg transition-colors placeholder:text-black/30 dark:placeholder:text-white/30"
-                />
-
-                <input
-                  type="text"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Описание"
-                  className="w-full px-4 py-3 bg-black/5 dark:bg-white/5 border border-transparent focus:border-black/20 dark:focus:border-white/20 rounded-lg transition-colors placeholder:text-black/30 dark:placeholder:text-white/30"
-                />
+                    <input
+                      type="text"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Описание"
+                      className="w-full px-4 py-3 bg-black/5 dark:bg-white/5 border border-transparent focus:border-black/20 dark:focus:border-white/20 rounded-lg transition-colors placeholder:text-black/30 dark:placeholder:text-white/30"
+                    />
+                  </>
+                )}
 
                 {/* Редактор */}
-                <div className="border border-black/10 dark:border-white/10 rounded-lg overflow-hidden">
-                  <MarkdownEditor
-                    value={content}
-                    onChange={({ text }) => setContent(text)}
-                    renderHTML={(text) => mdParser.render(text)}
-                    style={{ height: isMobile ? 400 : 550 }}
-                  />
+                <div className={`${isFullscreen ? 'flex-1 flex flex-col' : ''}`}>
+                  {/* Панель инструментов редактора (только не в полноэкранном режиме) */}
+                  {!isFullscreen && (
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-black/40 dark:text-white/40">
+                          Редактор
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setShowMediaManager(true)}
+                          className="px-3 py-1.5 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg text-sm transition-colors flex items-center gap-1"
+                        >
+                          <span className="text-lg">🖼️</span>
+                          <span className="hidden sm:inline">Медиа</span>
+                        </button>
+                        <button
+                          onClick={() => setShowVersionHistory(true)}
+                          className="px-3 py-1.5 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg text-sm transition-colors flex items-center gap-1"
+                        >
+                          <span className="text-lg">📋</span>
+                          <span className="hidden sm:inline">История</span>
+                        </button>
+                        <button
+                          onClick={() => setShowTocGenerator(true)}
+                          className="px-3 py-1.5 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg text-sm transition-colors flex items-center gap-1"
+                          title="Сгенерировать оглавление"
+                        >
+                          <span className="text-lg">📑</span>
+                          <span className="hidden sm:inline">TOC</span>
+                        </button>
+                        <button
+                          onClick={toggleFullscreen}
+                          className="px-3 py-1.5 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg text-sm transition-colors flex items-center gap-1"
+                          title="На весь экран"
+                        >
+                          <span className="text-lg">⛶</span>
+                          <span className="hidden sm:inline">На весь экран</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Редактор с ограничением по высоте */}
+                  <div className={`border border-black/10 dark:border-white/10 rounded-xl overflow-hidden ${
+                    isFullscreen ? 'flex-1 shadow-2xl' : ''
+                  }`}>
+                    <MarkdownEditor
+                      value={content}
+                      onChange={({ text }) => setContent(text)}
+                      renderHTML={(text) => mdParser.render(text)}
+                      config={{
+                        view: {
+                          menu: true,
+                          md: true,
+                          html: true,
+                        },
+                        canView: {
+                          menu: true,
+                          md: true,
+                          html: true,
+                          both: true,
+                          fullScreen: false,
+                        },
+                      }}
+                      style={{ 
+                        height: isFullscreen ? '100%' : (isMobile ? 400 : 550),
+                        width: '100%',
+                        maxHeight: isFullscreen ? 'calc(100vh - 120px)' : 'none',
+                      }}
+                    />
+                  </div>
                 </div>
 
                 {/* Кнопки действий */}
-                <div className="flex flex-wrap gap-3 pt-4">
-                  {/* Кнопка медиа */}
-                  <button
-                    onClick={() => setShowMediaManager(true)}
-                    className="px-6 py-3 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg font-medium transition-colors flex items-center gap-2 group"
-                  >
-                    <span className="text-lg group-hover:scale-110 transition-transform">🖼️</span>
-                    <span>Медиа</span>
-                  </button>
-
-                  {/* Кнопка сохранения */}
+                <div className={`flex flex-wrap gap-3 ${isFullscreen ? 'mt-4' : 'pt-4'}`}>
                   <button
                     onClick={saveFile}
                     disabled={isSaving}
-                    className="px-6 py-3 bg-black/90 dark:bg-white/90 text-white dark:text-black rounded-lg font-medium hover:bg-black dark:hover:bg-white transition-colors disabled:opacity-50 flex items-center gap-2 group"
+                    className="px-6 py-3 bg-black/90 dark:bg-white/90 text-white dark:text-black rounded-xl font-medium hover:bg-black dark:hover:bg-white transition-colors disabled:opacity-50 flex items-center gap-2 group shadow-lg"
                   >
                     {isSaving ? (
                       <>
@@ -966,15 +1212,15 @@ MIT
                     )}
                   </button>
                   
-                  {/* Кнопка отмены */}
                   <button
                     onClick={() => {
                       setSelected("");
                       setTitle("");
                       setDescription("");
                       setContent("");
+                      if (isFullscreen) toggleFullscreen();
                     }}
-                    className="px-6 py-3 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg font-medium transition-colors flex items-center gap-2 group"
+                    className="px-6 py-3 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-xl font-medium transition-colors flex items-center gap-2 group"
                   >
                     <span className="text-lg group-hover:scale-110 transition-transform">✕</span>
                     <span>Отмена</span>
@@ -1470,19 +1716,107 @@ MIT
         </div>
       </div>
 
+      {/* Модальное окно успешного сохранения */}
+      {showSaveModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-fadeIn">
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={handleCloseSaveModal}
+          />
+          
+          <div className="relative bg-white dark:bg-black rounded-2xl shadow-2xl max-w-md w-full p-8 border border-black/10 dark:border-white/10 animate-slideUp">
+            <div className="w-20 h-20 mx-auto mb-6 bg-black/10 dark:bg-white/10 rounded-full flex items-center justify-center">
+              <div className="w-16 h-16 bg-black/90 dark:bg-white/90 rounded-full flex items-center justify-center text-white dark:text-black text-4xl shadow-lg">
+                ✓
+              </div>
+            </div>
+            
+            <h3 className="text-2xl font-light text-center text-black/80 dark:text-white/80 mb-2">
+              Изменения сохранены
+            </h3>
+            
+            <p className="text-center text-black/50 dark:text-white/50 mb-8">
+              Документ успешно обновлен
+            </p>
+            
+            <button
+              onClick={handleCloseSaveModal}
+              className="w-full px-6 py-4 bg-black/90 dark:bg-white/90 text-white dark:text-black rounded-xl font-medium hover:bg-black dark:hover:bg-white transition-all duration-300 flex items-center justify-center gap-2 group"
+            >
+              <span>Вернуться к аналитике</span>
+              <span className="text-lg group-hover:translate-x-1 transition-transform">→</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно истории версий */}
+      {showVersionHistory && selected && (
+        <VersionHistory
+          filename={selected}
+          onRestore={handleRestoreVersion}
+          onClose={() => setShowVersionHistory(false)}
+        />
+      )}
+
+      {/* Модальное окно массовых операций */}
+      {showBulkOperations && (
+        <BulkOperations
+          selectedDocs={selectedDocs}
+          folders={folders}
+          onClose={() => setShowBulkOperations(false)}
+          onMove={handleBulkMove}
+          onDelete={handleBulkDelete}
+          onExport={handleBulkExport}
+        />
+      )}
+
+      {/* Модальное окно генератора оглавления */}
+      {showTocGenerator && selected && (
+        <TocGenerator
+          content={content}
+          onInsert={handleInsertToc}
+          onClose={() => setShowTocGenerator(false)}
+        />
+      )}
+
+      {/* Подсказка о горячих клавишах (только для сохранения) */}
+      {selected && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 px-4 py-2 bg-black/80 dark:bg-white/80 text-white dark:text-black rounded-full text-sm shadow-lg backdrop-blur-sm">
+          <span className="flex items-center gap-1">
+            <span className="px-1.5 py-0.5 bg-white/20 dark:bg-black/20 rounded text-xs">⌘S</span>
+            <span>Сохранить</span>
+          </span>
+        </div>
+      )}
+
       <style jsx>{`
         @keyframes fadeIn {
           from {
             opacity: 0;
-            transform: translateY(-10px) scale(0.98);
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(30px) scale(0.95);
           }
           to {
             opacity: 1;
             transform: translateY(0) scale(1);
           }
         }
+        
         .animate-fadeIn {
-          animation: fadeIn 0.2s cubic-bezier(0.2, 0, 0, 1) forwards;
+          animation: fadeIn 0.3s ease-out forwards;
+        }
+        
+        .animate-slideUp {
+          animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
       `}</style>
     </div>

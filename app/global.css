@@ -12,40 +12,56 @@
 }
 
 /* Стили для печати */
+/* Стили для печати */
 @media print {
   /* Скрываем ненужные элементы */
   nav,
   footer,
   .nextra-nav-container,
-  .print\:hidden {
+  .print\:hidden,
+  button,
+  [role="dialog"],
+  .fixed {
     display: none !important;
   }
 
-  /* Основные настройки */
+  /* Основной контент */
   body {
     background: white !important;
     color: black !important;
     font-size: 12pt !important;
-    line-height: 1.5 !important;
+    line-height: 1.6 !important;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
   }
 
-  /* Контент на всю ширину */
-  main,
-  article,
-  .prose {
+  main, article, .fumadocs-content, .prose {
     max-width: 100% !important;
     padding: 2rem !important;
     margin: 0 !important;
     background: white !important;
-    color: black !important;
   }
 
   /* Заголовки */
-  h1 { font-size: 24pt !important; color: #000 !important; }
-  h2 { font-size: 18pt !important; color: #000 !important; }
-  h3 { font-size: 14pt !important; color: #000 !important; }
-  h4 { font-size: 12pt !important; color: #000 !important; }
+  h1 { 
+    font-size: 24pt !important; 
+    margin: 0.5em 0 !important;
+    color: #000 !important;
+    page-break-after: avoid !important;
+  }
+  
+  h2 { 
+    font-size: 18pt !important; 
+    margin: 0.5em 0 !important;
+    color: #000 !important;
+    page-break-after: avoid !important;
+  }
+  
+  h3 { 
+    font-size: 14pt !important; 
+    margin: 0.5em 0 !important;
+    color: #000 !important;
+    page-break-after: avoid !important;
+  }
 
   /* Код */
   pre, code {
@@ -53,6 +69,18 @@
     color: #000 !important;
     border: 1px solid #ddd !important;
     page-break-inside: avoid !important;
+    font-size: 10pt !important;
+    font-family: 'SF Mono', Monaco, Consolas, monospace !important;
+  }
+
+  pre {
+    padding: 12px !important;
+    border-radius: 8px !important;
+  }
+
+  code {
+    padding: 2px 4px !important;
+    border-radius: 4px !important;
   }
 
   /* Ссылки */
@@ -65,6 +93,7 @@
     content: " (" attr(href) ")";
     font-size: 10pt;
     color: #666;
+    font-style: italic;
   }
 
   /* Таблицы */
@@ -72,11 +101,12 @@
     page-break-inside: avoid !important;
     border-collapse: collapse !important;
     width: 100% !important;
+    margin: 1em 0 !important;
   }
 
   th, td {
     border: 1px solid #ddd !important;
-    padding: 8px !important;
+    padding: 8px 12px !important;
     text-align: left !important;
   }
 
@@ -88,6 +118,7 @@
   /* Изображения */
   img {
     max-width: 100% !important;
+    height: auto !important;
     page-break-inside: avoid !important;
   }
 
@@ -100,18 +131,20 @@
     page-break-inside: avoid !important;
   }
 
-  /* Номера страниц */
+  /* Нумерация страниц */
   @page {
-    margin: 2cm;
+    margin: 2.5cm 2cm;
     @top-center {
-      content: "Документация";
+      content: "Gicam Dock";
       font-size: 9pt;
       color: #666;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
     @bottom-center {
       content: "Страница " counter(page);
       font-size: 9pt;
       color: #666;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
   }
 }

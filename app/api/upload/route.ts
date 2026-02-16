@@ -31,7 +31,17 @@ export async function POST(req: NextRequest) {
       } else if (fileType.startsWith("video/")) {
         targetFolder = "videos";
       } else {
-        targetFolder = "files";
+        // Определяем по расширению для большей точности
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        if (ext === 'gif') {
+          targetFolder = "gifs";
+        } else if (['jpg', 'jpeg', 'png', 'webp', 'svg'].includes(ext || '')) {
+          targetFolder = "images";
+        } else if (['mp4', 'webm', 'mov', 'avi'].includes(ext || '')) {
+          targetFolder = "videos";
+        } else {
+          targetFolder = "files";
+        }
       }
     }
 
@@ -41,7 +51,7 @@ export async function POST(req: NextRequest) {
     
     // Генерируем уникальное имя файла
     const timestamp = Date.now();
-    const originalName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const originalName = file.name.replace(/[^a-zA-Z0-9.\u0400-\u04FF-]/g, '_');
     const fileName = `${timestamp}-${originalName}`;
     
     // Путь для сохранения

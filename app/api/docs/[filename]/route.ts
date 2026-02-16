@@ -5,20 +5,24 @@ import matter from "gray-matter";
 
 const docsPath = path.join(process.cwd(), "content/docs");
 
-// 📥 ПОЛУЧЕНИЕ КОНКРЕТНОГО ДОКУМЕНТА
+// 📥 ПОЛУЧЕНИЕ КОНКРЕТНОГО ДОКУМЕНТА (с поддержкой вложенных папок)
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ filename: string }> }  // Вот здесь добавили Promise
+  { params }: { params: Promise<{ filename: string }> }
 ) {
   try {
-    const { filename } = await params;  // И здесь добавили await
+    // Получаем filename из params
+    const { filename } = await params;
     
-    // Декодируем filename (он может содержать спецсимволы)
-    const decodedFilename = decodeURIComponent(filename);
+    // Декодируем filename (он может содержать слеши для вложенных папок)
+    const decodedPath = decodeURIComponent(filename);
     
     // Защита от path traversal
-    const safeFilename = path.basename(decodedFilename);
-    const filePath = path.join(docsPath, safeFilename);
+    // Убираем любые попытки выйти за пределы docsPath
+    const safePath = decodedPath.replace(/\.\.\//g, '');
+    
+    // Формируем полный путь к файлу
+    const filePath = path.join(docsPath, safePath);
 
     // Проверяем, что файл находится внутри docsPath
     if (!filePath.startsWith(docsPath)) {
@@ -36,17 +40,34 @@ export async function GET(
       );
     }
 
+    // Проверяем, что это файл (не папка)
+    const stat = fs.statSync(filePath);
+    if (stat.isDirectory()) {
+      return NextResponse.json(
+        { error: "Path is a directory" },
+        { status: 400 }
+      );
+    }
+
     // Читаем и парсим файл
     const raw = fs.readFileSync(filePath, "utf-8");
     const { data, content } = matter(raw);
 
+    // Получаем относительный путь для folder
+    const relativePath = path.relative(docsPath, filePath);
+    const folder = path.dirname(relativePath);
+    const filename_only = path.basename(relativePath);
+
     return NextResponse.json({
-      filename: safeFilename,
+      filename: filename_only,
       title: data.title || "",
       description: data.description || "",
       content: content || "",
-      lastModified: fs.statSync(filePath).mtime.toISOString().split('T')[0],
+      lastModified: stat.mtime.toISOString().split('T')[0],
+      path: relativePath,
+      folder: folder === '.' ? '' : folder,
     });
+    
   } catch (error) {
     console.error("GET specific file error:", error);
     return NextResponse.json(
@@ -56,23 +77,18 @@ export async function GET(
   }
 }
 
-// 🗑️ УДАЛЕНИЕ КОНКРЕТНОГО ДОКУМЕНТА
+// 🗑️ УДАЛЕНИЕ КОНКРЕТНОГО ДОКУМЕНТА (с поддержкой вложенных папок)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ filename: string }> }
 ) {
   try {
-    // В Next.js 15 params нужно ожидать с await
     const { filename } = await params;
     
-    // Декодируем filename
-    const decodedFilename = decodeURIComponent(filename);
-    
-    // Защита от path traversal
-    const safeFilename = path.basename(decodedFilename);
-    const filePath = path.join(docsPath, safeFilename);
+    const decodedPath = decodeURIComponent(filename);
+    const safePath = decodedPath.replace(/\.\.\//g, '');
+    const filePath = path.join(docsPath, safePath);
 
-    // Проверяем, что файл находится внутри docsPath
     if (!filePath.startsWith(docsPath)) {
       return NextResponse.json(
         { error: "Invalid file path" },
@@ -80,7 +96,6 @@ export async function DELETE(
       );
     }
 
-    // Проверяем, существует ли файл
     if (!fs.existsSync(filePath)) {
       return NextResponse.json(
         { error: "File not found" },
@@ -88,7 +103,14 @@ export async function DELETE(
       );
     }
 
-    // Проверяем расширение файла
+    const stat = fs.statSync(filePath);
+    if (stat.isDirectory()) {
+      return NextResponse.json(
+        { error: "Cannot delete directory with this endpoint" },
+        { status: 400 }
+      );
+    }
+
     if (!filePath.endsWith(".md") && !filePath.endsWith(".mdx")) {
       return NextResponse.json(
         { error: "Can only delete .md or .mdx files" },
@@ -96,14 +118,13 @@ export async function DELETE(
       );
     }
 
-    // Удаляем файл
     fs.unlinkSync(filePath);
 
     return NextResponse.json({ 
       success: true, 
-      message: `File ${safeFilename} deleted successfully`,
-      filename: safeFilename 
+      message: `File deleted successfully`,
     });
+    
   } catch (error) {
     console.error("DELETE error:", error);
     return NextResponse.json(

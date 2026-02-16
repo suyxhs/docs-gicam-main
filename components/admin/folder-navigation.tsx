@@ -34,9 +34,11 @@ export function FolderNavigation({
   };
 
   const handleDeleteClick = (e: React.MouseEvent, folder: string) => {
-    e.stopPropagation();
-    setFolderToDelete(folder);
-  };
+  e.stopPropagation();
+  // Формируем полный путь к папке
+  const fullPath = currentFolder ? `${currentFolder}/${folder}` : folder;
+  setFolderToDelete(fullPath);
+};
 
   const confirmDelete = () => {
     if (folderToDelete) {
