@@ -1,3 +1,224 @@
 @import 'tailwindcss';
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
+/* app/admin/globals.css */
+@import 'react-markdown-editor-lite/lib/index.css';
+
+/* Твои кастомные стили для редактора */
+.rc-md-editor {
+  border: none !important;
+  background-color: transparent !important;
+  border-radius: 1rem !important;
+}
+
+/* Стили для печати */
+@media print {
+  /* Скрываем ненужные элементы */
+  nav,
+  footer,
+  .nextra-nav-container,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Основные настройки */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt !important;
+    line-height: 1.5 !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+  }
+
+  /* Контент на всю ширину */
+  main,
+  article,
+  .prose {
+    max-width: 100% !important;
+    padding: 2rem !important;
+    margin: 0 !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Заголовки */
+  h1 { font-size: 24pt !important; color: #000 !important; }
+  h2 { font-size: 18pt !important; color: #000 !important; }
+  h3 { font-size: 14pt !important; color: #000 !important; }
+  h4 { font-size: 12pt !important; color: #000 !important; }
+
+  /* Код */
+  pre, code {
+    background: #f5f5f5 !important;
+    color: #000 !important;
+    border: 1px solid #ddd !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Ссылки */
+  a {
+    color: #0066cc !important;
+    text-decoration: underline !important;
+  }
+
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 10pt;
+    color: #666;
+  }
+
+  /* Таблицы */
+  table {
+    page-break-inside: avoid !important;
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  th, td {
+    border: 1px solid #ddd !important;
+    padding: 8px !important;
+    text-align: left !important;
+  }
+
+  th {
+    background: #f5f5f5 !important;
+    font-weight: bold !important;
+  }
+
+  /* Изображения */
+  img {
+    max-width: 100% !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Предотвращаем разрывы */
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid !important;
+  }
+
+  p, li, blockquote {
+    page-break-inside: avoid !important;
+  }
+
+  /* Номера страниц */
+  @page {
+    margin: 2cm;
+    @top-center {
+      content: "Документация";
+      font-size: 9pt;
+      color: #666;
+    }
+    @bottom-center {
+      content: "Страница " counter(page);
+      font-size: 9pt;
+      color: #666;
+    }
+  }
+}
+
+/* Анимация для выпадающего меню */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+/* Стили для мобильного меню */
+@media (max-width: 768px) {
+  .mobile-actions-menu {
+    position: relative;
+  }
+  
+  .mobile-actions-menu button:first-child {
+    min-width: 100px;
+    justify-content: center;
+  }
+}
+
+/* Стили для плавающей кнопки */
+.fab-container {
+  filter: drop-shadow(0 10px 15px -3px rgba(0, 0, 0, 0.1));
+}
+
+/* Анимация появления меню */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-slideUp {
+  animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Анимация для уведомлений */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slideIn {
+  animation: slideIn 0.3s ease-out forwards;
+}
+
+/* Адаптация для мобильных */
+@media (max-width: 768px) {
+  .fab-container {
+    bottom: 20px;
+    right: 20px;
+  }
+
+  .fab-container button:first-child {
+    width: 56px;
+    height: 56px;
+    font-size: 24px;
+  }
+}
+
+/* Стили для печати */
+@media print {
+  .fab-container {
+    display: none !important;
+  }
+}
+
+/* Эффект пульсации */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.3);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(0, 0, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  }
+}
+
+.fab-container > button:first-child {
+  animation: pulse 2s infinite;
+}
+
+.fab-container > button:first-child:hover {
+  animation: none;
+}
