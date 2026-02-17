@@ -8,7 +8,7 @@ interface DeleteFolderModalProps {
   folderPath: string;
   onClose: () => void;
   onConfirm: (force?: boolean) => void;
-  isDeleting?: boolean; // Должен быть boolean, не null
+  isDeleting?: boolean; // Только boolean или undefined, но не null
   folderInfo?: {
     filesCount: number;
     foldersCount: number;
@@ -67,7 +67,12 @@ export function DeleteFolderModal({
   if (!isOpen) return null;
 
   const hasContent = folderInfo && folderInfo.totalItems > 0;
-  const isDeleteDisabled = confirmText !== folderName || isDeleting || (hasContent && !forceDelete);
+  
+  // Явно преобразуем в boolean для disabled пропа
+  const isInputDisabled = Boolean(isDeleting);
+  const isDeleteButtonDisabled = Boolean(
+    confirmText !== folderName || isDeleting || (hasContent && !forceDelete)
+  );
 
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
@@ -197,7 +202,7 @@ export function DeleteFolderModal({
                   ? 'border-red-500/50 dark:border-red-500/50' 
                   : 'border-transparent focus:border-black/20 dark:focus:border-white/20'
               }`}
-              disabled={isDeleting}
+              disabled={isInputDisabled}
               autoFocus
             />
             {error && (
@@ -213,14 +218,14 @@ export function DeleteFolderModal({
         <div className="px-6 py-4 border-t border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 flex items-center justify-end gap-3">
           <button
             onClick={onClose}
-            disabled={isDeleting}
+            disabled={isInputDisabled}
             className="px-4 py-2 text-sm text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors disabled:opacity-50"
           >
             Отмена
           </button>
           <button
             onClick={handleConfirm}
-            disabled={isDeleteDisabled}
+            disabled={isDeleteButtonDisabled}
             className="px-6 py-2 bg-black/90 dark:bg-white/90 text-white dark:text-black rounded-lg text-sm font-medium hover:bg-black dark:hover:bg-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isDeleting ? (
