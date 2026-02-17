@@ -8,6 +8,8 @@ import { MediaManager } from "@/components/admin/media-manager";
 import { VersionHistory } from "@/components/admin/version-history";
 import { BulkOperations } from "@/components/admin/bulk-operations";
 import { TocGenerator } from "@/components/admin/toc-generator";
+import { CreateFileModal } from "@/components/admin/create-file-modal";
+import { DeleteFolderModal } from "@/components/admin/delete-folder-modal";
 import "./editor.css";
 
 // Динамический импорт MarkdownEditor
@@ -77,6 +79,7 @@ export default function AdminPage() {
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showBulkOperations, setShowBulkOperations] = useState(false);
   const [showTocGenerator, setShowTocGenerator] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -87,6 +90,15 @@ export default function AdminPage() {
     docsByFolder: [],
     activityLastWeek: [],
   });
+
+  // Состояния для удаления папки
+  const [folderToDelete, setFolderToDelete] = useState<string | null>(null);
+  const [isDeletingFolder, setIsDeletingFolder] = useState(false);
+  const [folderInfo, setFolderInfo] = useState<{
+    filesCount: number;
+    foldersCount: number;
+    totalItems: number;
+  } | null>(null);
 
   // Пагинация для документов
   const [currentPage, setCurrentPage] = useState(1);
@@ -126,7 +138,7 @@ export default function AdminPage() {
 
   // Блокировка скролла body в полноэкранном режиме и при открытых модальных окнах
   useEffect(() => {
-    if (isFullscreen || showSaveModal || showVersionHistory || showMediaManager || showBulkOperations || showTocGenerator) {
+    if (isFullscreen || showSaveModal || showVersionHistory || showMediaManager || showBulkOperations || showTocGenerator || showCreateModal || folderToDelete) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -134,7 +146,7 @@ export default function AdminPage() {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isFullscreen, showSaveModal, showVersionHistory, showMediaManager, showBulkOperations, showTocGenerator]);
+  }, [isFullscreen, showSaveModal, showVersionHistory, showMediaManager, showBulkOperations, showTocGenerator, showCreateModal, folderToDelete]);
 
   // Глобальные горячие клавиши (только сохранение и ESC)
   useEffect(() => {
@@ -151,6 +163,9 @@ export default function AdminPage() {
         setShowTemplates(false);
         setShowBulkOperations(false);
         setShowTocGenerator(false);
+        setShowCreateModal(false);
+        setFolderToDelete(null);
+        setFolderInfo(null);
       }
     };
 
@@ -299,20 +314,22 @@ export default function AdminPage() {
     if (isFullscreen) setIsFullscreen(false);
   };
 
-  // Создание нового файла
+  // Создание нового файла (открытие модального окна)
   const createNew = () => {
-    const fileNameInput = prompt("Введите имя файла (например: new-page.mdx)");
-    if (!fileNameInput) return;
-    
-    const filename = fileNameInput.includes('.') ? fileNameInput : `${fileNameInput}.mdx`;
+    setShowCreateModal(true);
+  };
+
+  // Обработка создания файла из модального окна
+  const handleCreateFile = (filename: string, templateContent: string) => {
     const fullPath = currentFolder ? `${currentFolder}/${filename}` : filename;
     
     setSelected(fullPath);
-    setTitle("Новая страница");
-    setDescription("Описание страницы");
-    setContent(`# Заголовок документа\n\nНачните писать здесь...`);
+    setTitle(filename.replace(/\.(md|mdx)$/, '').split('/').pop() || 'Новый документ');
+    setDescription("Новый документ");
+    setContent(templateContent);
+    
+    setShowCreateModal(false);
     setIsSidebarOpen(false);
-    setShowTemplates(false);
   };
 
   // Создание новой папки
@@ -341,23 +358,58 @@ export default function AdminPage() {
     }
   };
 
-  // Удаление папки
-  const deleteFolder = async (folder: string) => {
+  // Удаление папки (обновленная функция с поддержкой force)
+  const deleteFolder = async (folder: string, force: boolean = false) => {
     try {
-      const response = await fetch(`/api/docs/folder?folder=${encodeURIComponent(folder)}`, {
+      const response = await fetch(`/api/docs/folder?folder=${encodeURIComponent(folder)}&force=${force}`, {
         method: "DELETE",
       });
       
       if (!response.ok) {
         const data = await response.json();
+        
+        // Если папка не пуста и не было force, показываем информацию
+        if (data.filesCount !== undefined) {
+          setFolderInfo({
+            filesCount: data.filesCount,
+            foldersCount: data.foldersCount,
+            totalItems: data.totalItems
+          });
+          return false;
+        }
+        
         alert(data.error || "Ошибка удаления папки");
-        return;
+        return false;
       }
       
       await loadDocs();
+      return true;
     } catch (error) {
       console.error("Ошибка удаления папки:", error);
       alert("Не удалось удалить папку");
+      return false;
+    }
+  };
+
+  // Функция для открытия модалки удаления папки
+  const handleDeleteFolderClick = (folderPath: string) => {
+    setFolderToDelete(folderPath);
+    setFolderInfo(null); // Сбрасываем информацию
+  };
+
+  // Функция подтверждения удаления папки
+  const handleConfirmDeleteFolder = async (force: boolean = false) => {
+    if (!folderToDelete) return;
+    
+    setIsDeletingFolder(true);
+    try {
+      const success = await deleteFolder(folderToDelete, force);
+      if (success) {
+        setFolderToDelete(null);
+        setFolderInfo(null);
+      }
+    } finally {
+      setIsDeletingFolder(false);
     }
   };
 
@@ -565,13 +617,12 @@ export default function AdminPage() {
             </button>
           </div>
 
-          {/* Новые кнопки действий */}
+          {/* Кнопки действий */}
           <div className="mt-4 space-y-2">
             <button
               onClick={() => {
-                // Собираем все пути документов для массовых операций
                 const allDocs = files.map(f => f.path);
-                setSelectedDocs(allDocs.slice(0, 10)); // Для демо берем первые 10
+                setSelectedDocs(allDocs.slice(0, 10));
                 setShowBulkOperations(true);
               }}
               className="w-full px-4 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg text-sm transition-colors flex items-center gap-2"
@@ -601,6 +652,7 @@ export default function AdminPage() {
               onCreateFolder={createFolder}
               onDeleteFolder={deleteFolder}
               onMoveToParent={handleMoveToParent}
+              onDeleteClick={handleDeleteFolderClick}
             />
             
             <Pagination
@@ -1779,6 +1831,28 @@ MIT
           onClose={() => setShowTocGenerator(false)}
         />
       )}
+
+      {/* Модальное окно создания файла */}
+      <CreateFileModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreate={handleCreateFile}
+        currentFolder={currentFolder}
+      />
+
+      {/* Модальное окно удаления папки */}
+      <DeleteFolderModal
+        isOpen={!!folderToDelete}
+        folderName={folderToDelete?.split('/').pop() || ''}
+        folderPath={folderToDelete || ''}
+        onClose={() => {
+          setFolderToDelete(null);
+          setFolderInfo(null);
+        }}
+        onConfirm={handleConfirmDeleteFolder}
+        isDeleting={isDeletingFolder}
+        folderInfo={folderInfo}
+      />
 
       {/* Подсказка о горячих клавишах (только для сохранения) */}
       {selected && (

@@ -10,6 +10,7 @@ interface FolderNavigationProps {
   onCreateFolder: (folderName: string) => void;
   onDeleteFolder: (folder: string) => void;
   onMoveToParent: () => void;
+  onDeleteClick?: (folder: string) => void; // Новый проп для открытия модалки
 }
 
 export function FolderNavigation({
@@ -20,10 +21,10 @@ export function FolderNavigation({
   onCreateFolder,
   onDeleteFolder,
   onMoveToParent,
+  onDeleteClick,
 }: FolderNavigationProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
-  const [folderToDelete, setFolderToDelete] = useState<string | null>(null);
 
   const handleCreateFolder = () => {
     if (newFolderName.trim()) {
@@ -34,16 +35,12 @@ export function FolderNavigation({
   };
 
   const handleDeleteClick = (e: React.MouseEvent, folder: string) => {
-  e.stopPropagation();
-  // Формируем полный путь к папке
-  const fullPath = currentFolder ? `${currentFolder}/${folder}` : folder;
-  setFolderToDelete(fullPath);
-};
-
-  const confirmDelete = () => {
-    if (folderToDelete) {
-      onDeleteFolder(folderToDelete);
-      setFolderToDelete(null);
+    e.stopPropagation();
+    const fullPath = currentFolder ? `${currentFolder}/${folder}` : folder;
+    if (onDeleteClick) {
+      onDeleteClick(fullPath);
+    } else {
+      onDeleteFolder(fullPath);
     }
   };
 
@@ -120,34 +117,6 @@ export function FolderNavigation({
             >
               Отмена
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Диалог подтверждения удаления */}
-      {folderToDelete && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-black p-6 rounded-xl border border-black/10 dark:border-white/10 max-w-sm">
-            <h3 className="text-lg font-light text-black/80 dark:text-white/80 mb-4">
-              Удалить папку?
-            </h3>
-            <p className="text-sm text-black/60 dark:text-white/60 mb-6">
-              Папка «{folderToDelete}» будет удалена. Это действие нельзя отменить.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={confirmDelete}
-                className="flex-1 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded-lg text-sm transition-colors"
-              >
-                Удалить
-              </button>
-              <button
-                onClick={() => setFolderToDelete(null)}
-                className="flex-1 px-4 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg text-sm transition-colors"
-              >
-                Отмена
-              </button>
-            </div>
           </div>
         </div>
       )}

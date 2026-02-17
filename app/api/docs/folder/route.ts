@@ -51,10 +51,28 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// Функция для рекурсивного удаления папки со всем содержимым
+const deleteFolderRecursive = (folderPath: string) => {
+  if (fs.existsSync(folderPath)) {
+    fs.readdirSync(folderPath).forEach((file) => {
+      const curPath = path.join(folderPath, file);
+      if (fs.lstatSync(curPath).isDirectory()) {
+        // Рекурсивно удаляем вложенные папки
+        deleteFolderRecursive(curPath);
+      } else {
+        // Удаляем файлы
+        fs.unlinkSync(curPath);
+      }
+    });
+    fs.rmdirSync(folderPath);
+  }
+};
+
 export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const folder = searchParams.get("folder");
+    const force = searchParams.get("force") === "true"; // Параметр для принудительного удаления
 
     if (!folder) {
       return NextResponse.json(
@@ -82,19 +100,47 @@ export async function DELETE(req: NextRequest) {
 
     // Проверяем, пуста ли папка
     const items = fs.readdirSync(folderPath);
-    if (items.length > 0) {
+    
+    if (items.length > 0 && !force) {
+      // Возвращаем информацию о содержимом
+      const files = items.filter(item => {
+        const itemPath = path.join(folderPath, item);
+        return !fs.lstatSync(itemPath).isDirectory();
+      });
+      
+      const subfolders = items.filter(item => {
+        const itemPath = path.join(folderPath, item);
+        return fs.lstatSync(itemPath).isDirectory();
+      });
+
       return NextResponse.json(
-        { error: "Cannot delete non-empty folder" },
+        { 
+          error: "Folder is not empty",
+          isEmpty: false,
+          filesCount: files.length,
+          foldersCount: subfolders.length,
+          totalItems: items.length
+        },
         { status: 400 }
       );
     }
 
-    // Удаляем папку
-    fs.rmdirSync(folderPath);
+    // Если force=true или папка пуста, удаляем
+    if (force || items.length === 0) {
+      if (items.length > 0) {
+        // Рекурсивное удаление
+        deleteFolderRecursive(folderPath);
+      } else {
+        // Удаляем пустую папку
+        fs.rmdirSync(folderPath);
+      }
+    }
 
     return NextResponse.json({ 
       success: true, 
-      message: "Folder deleted successfully" 
+      message: force && items.length > 0 
+        ? "Folder and all contents deleted successfully" 
+        : "Folder deleted successfully" 
     });
     
   } catch (error) {
