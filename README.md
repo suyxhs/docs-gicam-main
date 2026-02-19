@@ -128,3 +128,108 @@ cp .env.example .env.local
 npm run dev
 ```
 Проект будет доступен на http://localhost:3000
+
+### Переменные окружения
+
+```bash
+# GitHub API (для документов)
+GITHUB_TOKEN=your_github_token
+GITHUB_OWNER=GiCAM-sensor
+GITHUB_REPO=GiCAM-doc
+
+# Vercel Blob (для медиа)
+BLOB_READ_WRITE_TOKEN=your_vercel_blob_token
+
+# Аутентификация
+ADMIN_PASSWORD=your_secure_password
+JWT_SECRET=your_jwt_secret_key
+
+# Опционально
+NEXT_PUBLIC_SITE_URL=https://doc.gicam.ru
+```
+
+### Сборка для продакшена
+
+```bash
+npm run build
+npm start
+```
+
+---
+
+### 📁 Структура проекта
+
+```bash
+📂 GiCAM-doc
+ ┣ 📂 app                    # Next.js App Router
+ ┃ ┣ 📂 api                  # API роуты
+ ┃ ┃ ┣ 📂 docs               # Управление документами
+ ┃ ┃ ┣ 📂 upload             # Загрузка медиа
+ ┃ ┃ ┗ 📂 login              # Аутентификация
+ ┃ ┣ 📂 admin                # Админ-панель
+ ┃ ┣ 📂 docs                 # Публичная документация
+ ┃ ┗ 📜 layout.tsx           # Корневой layout
+ ┣ 📂 components             # React компоненты
+ ┃ ┣ 📂 admin                # Компоненты админки
+ ┃ ┃ ┣ 📜 folder-navigation.tsx
+ ┃ ┃ ┣ 📜 media-manager.tsx
+ ┃ ┃ ┣ 📜 create-file-modal.tsx
+ ┃ ┃ ┗ 📜 delete-folder-modal.tsx
+ ┃ ┗ 📂 docs                 # Компоненты документации
+ ┃   ┣ 📜 action-buttons.tsx
+ ┃   ┗ 📜 pdf-generator.tsx
+ ┣ 📂 content                # MDX документы
+ ┃ ┗ 📂 docs                 # Исходники документации
+ ┣ 📂 lib                    # Утилиты и хелперы
+ ┣ 📂 public                 # Статические файлы
+ ┃ ┣ 📂 images               # Изображения
+ ┃ ┣ 📂 videos               # Видео
+ ┃ ┣ 📂 gifs                 # GIF
+ ┃ ┗ 📂 files                # Документы
+ ┣ 📜 .env.example           # Пример переменных окружения
+ ┣ 📜 next.config.mjs        # Конфигурация Next.js
+ ┣ 📜 package.json           # Зависимости
+ ┗ 📜 README.md              # Документация проекта
+```
+
+---
+
+### ⚙️ Конфигурация
+
+## GitHub API
+
+Для работы с документами через GitHub API:
+
+### **Создать Personal Access Token**
+- Зайти на <a href="https://github.com/settings/tokens">GitHub Settings → Tokens</a>
+- Нажать "Generate new token (classic)"
+- Выбрать права: repo (полный доступ)
+- Скопировать токен
+
+### **Добавить токен в .env.local**
+- 
+```bash
+npm run build
+npm start
+```
+## Vercel Blob (для медиа)
+
+### **Подключить Vercel Blob**
+- 
+```bash
+npx vercel blob init
+```
+
+### **Получить токен**
+- Токен появится в выводе команды
+- Добавить в .env.local:
+- 
+```bash
+BLOB_READ_WRITE_TOKEN=vercel_blob_token
+```
+
+<p align="center"> <b>Сделано с ❤️ </b><br /> <a href="https://doc.gicam.ru">doc.gicam.ru</a> </p><p align="center"> <img src="https://img.shields.io/github/stars/GiCAM-sensor/GiCAM-doc?style=social" alt="Stars" /> <img src="https://img.shields.io/github/forks/GiCAM-sensor/GiCAM-doc?style=social" alt="Forks" /> <img src="https://img.shields.io/github/issues/GiCAM-sensor/GiCAM-doc?style=social" alt="Issues" /> </p> ```
+
+
+
+
