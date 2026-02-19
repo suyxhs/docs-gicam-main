@@ -21,13 +21,11 @@ export default async function Page(props: PageProps) {
 
   const MDXContent = page.data.body;
 
-  // Получаем путь к файлу из структуры source
-  // В fumadocs путь можно получить из page.slugs
+  // Получаем путь к файлу для GitHub
   const filePath = page.slugs.length > 0 
     ? `${page.slugs.join('/')}.mdx`
     : 'index.mdx';
 
-  // Формируем URL для GitHub
   const githubUrl = `https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/content/docs/${filePath}`;
 
   return (

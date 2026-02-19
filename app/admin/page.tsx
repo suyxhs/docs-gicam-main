@@ -5,9 +5,6 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { FolderNavigation } from "@/components/admin/folder-navigation";
 import { MediaManager } from "@/components/admin/media-manager";
-import { VersionHistory } from "@/components/admin/version-history";
-import { BulkOperations } from "@/components/admin/bulk-operations";
-import { TocGenerator } from "@/components/admin/toc-generator";
 import { CreateFileModal } from "@/components/admin/create-file-modal";
 import { DeleteFolderModal } from "@/components/admin/delete-folder-modal";
 import "./editor.css";
@@ -74,13 +71,10 @@ export default function AdminPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [screenSize, setScreenSize] = useState<'mobile' | 'tablet' | 'desktop' | 'wide' | 'ultrawide'>('desktop');
   const [showTemplates, setShowTemplates] = useState(false);
   const [showMediaManager, setShowMediaManager] = useState(false);
-  const [showVersionHistory, setShowVersionHistory] = useState(false);
-  const [showBulkOperations, setShowBulkOperations] = useState(false);
-  const [showTocGenerator, setShowTocGenerator] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [analytics, setAnalytics] = useState<AnalyticsData>({
@@ -114,15 +108,22 @@ export default function AdminPage() {
     }
   }, []);
 
-  // Проверка мобильного устройства
+  // Определение размера экрана
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+    const checkScreenSize = () => {
+      const width = window.innerWidth;
+      setIsMobile(width < 768);
+      
+      if (width < 768) setScreenSize('mobile');
+      else if (width < 1024) setScreenSize('tablet');
+      else if (width < 1440) setScreenSize('desktop');
+      else if (width < 1920) setScreenSize('wide');
+      else setScreenSize('ultrawide'); // 1920px и выше, включая 2560px
     };
     
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
   // Закрытие шаблонов при клике вне
@@ -138,7 +139,7 @@ export default function AdminPage() {
 
   // Блокировка скролла body в полноэкранном режиме и при открытых модальных окнах
   useEffect(() => {
-    if (isFullscreen || showSaveModal || showVersionHistory || showMediaManager || showBulkOperations || showTocGenerator || showCreateModal || folderToDelete) {
+    if (isFullscreen || showSaveModal || showMediaManager || showCreateModal || folderToDelete) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -146,7 +147,7 @@ export default function AdminPage() {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isFullscreen, showSaveModal, showVersionHistory, showMediaManager, showBulkOperations, showTocGenerator, showCreateModal, folderToDelete]);
+  }, [isFullscreen, showSaveModal, showMediaManager, showCreateModal, folderToDelete]);
 
   // Глобальные горячие клавиши (только сохранение и ESC)
   useEffect(() => {
@@ -158,11 +159,8 @@ export default function AdminPage() {
       }
       // Esc для закрытия модалок
       if (e.key === 'Escape') {
-        setShowVersionHistory(false);
         setShowMediaManager(false);
         setShowTemplates(false);
-        setShowBulkOperations(false);
-        setShowTocGenerator(false);
         setShowCreateModal(false);
         setFolderToDelete(null);
         setFolderInfo(null);
@@ -358,7 +356,7 @@ export default function AdminPage() {
     }
   };
 
-  // Удаление папки (обновленная функция с поддержкой force)
+  // Удаление папки
   const deleteFolder = async (folder: string, force: boolean = false) => {
     try {
       const response = await fetch(`/api/docs/folder?folder=${encodeURIComponent(folder)}&force=${force}`, {
@@ -454,57 +452,6 @@ export default function AdminPage() {
     handleFolderClick(parent);
   };
 
-  // Восстановление версии
-  const handleRestoreVersion = (versionId: string) => {
-    alert(`Восстановление версии ${versionId}`);
-    setShowVersionHistory(false);
-  };
-
-  // Массовое перемещение
-  const handleBulkMove = async (targetFolder: string, docs: string[]) => {
-    console.log(`Перемещение ${docs.length} документов в ${targetFolder || 'корень'}`);
-    
-    // Здесь будет логика перемещения через API
-    for (const doc of docs) {
-      console.log(`Перемещение ${doc} -> ${targetFolder}`);
-    }
-    
-    alert(`Перемещение ${docs.length} документов выполнено`);
-    setShowBulkOperations(false);
-    setSelectedDocs([]);
-  };
-
-  // Массовое удаление
-  const handleBulkDelete = async (docs: string[]) => {
-    if (confirm(`Удалить ${docs.length} документов?`)) {
-      console.log(`Удаление ${docs.length} документов`);
-      
-      // Здесь будет логика удаления через API
-      for (const doc of docs) {
-        console.log(`Удаление ${doc}`);
-      }
-      
-      alert(`Удаление ${docs.length} документов выполнено`);
-      setShowBulkOperations(false);
-      setSelectedDocs([]);
-    }
-  };
-
-  // Массовый экспорт
-  const handleBulkExport = async (docs: string[]) => {
-    console.log(`Экспорт ${docs.length} документов в ZIP`);
-    
-    // Здесь будет логика экспорта через API
-    alert(`Экспорт ${docs.length} документов начат`);
-    setShowBulkOperations(false);
-  };
-
-  // Вставка оглавления
-  const handleInsertToc = (toc: string) => {
-    setContent(toc + '\n\n' + content);
-    setShowTocGenerator(false);
-  };
-
   // Фильтрация документов
   const filteredFiles = files.filter(doc => 
     doc.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -562,6 +509,48 @@ export default function AdminPage() {
     setIsFullscreen(!isFullscreen);
   };
 
+  // Функция для получения максимальной ширины редактора в зависимости от размера экрана
+  const getEditorMaxWidth = () => {
+    if (isFullscreen) return '100%';
+    
+    switch (screenSize) {
+      case 'mobile': return '100%';
+      case 'tablet': return '100%';
+      case 'desktop': return '1200px';
+      case 'wide': return '1600px';
+      case 'ultrawide': return '2200px'; // Для 2560px экранов
+      default: return '1200px';
+    }
+  };
+
+  // Функция для получения высоты редактора
+  const getEditorHeight = () => {
+    if (isFullscreen) return '100%';
+    
+    switch (screenSize) {
+      case 'mobile': return 350;
+      case 'tablet': return 450;
+      case 'desktop': return 550;
+      case 'wide': return 650;
+      case 'ultrawide': return 750; // Больше высота для ультрашироких
+      default: return 550;
+    }
+  };
+
+  // Функция для получения отступов контента
+  const getContentPadding = () => {
+    if (isFullscreen) return 'p-4 md:p-8';
+    
+    switch (screenSize) {
+      case 'mobile': return 'p-3';
+      case 'tablet': return 'p-4 md:p-6';
+      case 'desktop': return 'p-6 md:p-8';
+      case 'wide': return 'p-8 md:p-10';
+      case 'ultrawide': return 'p-10 md:p-12'; // Больше отступы для ультрашироких
+      default: return 'p-6 md:p-8';
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
@@ -598,7 +587,7 @@ export default function AdminPage() {
         ${isFullscreen ? 'hidden' : ''}
       `}>
         {/* Хедер сайдбара */}
-        <div className="p-6 border-b border-black/10 dark:border-white/10">
+        <div className="p-4 md:p-6 border-b border-black/10 dark:border-white/10">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-sm font-medium text-black/80 dark:text-white/80">
@@ -616,34 +605,11 @@ export default function AdminPage() {
               ✕
             </button>
           </div>
-
-          {/* Кнопки действий */}
-          <div className="mt-4 space-y-2">
-            <button
-              onClick={() => {
-                const allDocs = files.map(f => f.path);
-                setSelectedDocs(allDocs.slice(0, 10));
-                setShowBulkOperations(true);
-              }}
-              className="w-full px-4 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg text-sm transition-colors flex items-center gap-2"
-            >
-              <span>📦</span>
-              <span>Массовые операции</span>
-            </button>
-            
-            <button
-              onClick={() => setShowVersionHistory(true)}
-              className="w-full px-4 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg text-sm transition-colors flex items-center gap-2"
-            >
-              <span>📋</span>
-              <span>История изменений</span>
-            </button>
-          </div>
         </div>
 
         {/* Навигация */}
         <div className="flex-1 overflow-y-auto">
-          <div className="p-6">
+          <div className="p-4 md:p-6">
             <FolderNavigation
               folders={paginatedFolders}
               currentFolder={currentFolder}
@@ -663,7 +629,7 @@ export default function AdminPage() {
           </div>
 
           {/* Поиск */}
-          <div className="px-6 pb-4">
+          <div className="px-4 md:px-6 pb-4">
             <input
               type="text"
               placeholder="Поиск..."
@@ -674,7 +640,7 @@ export default function AdminPage() {
           </div>
 
           {/* Список документов */}
-          <div className="px-6 pb-6">
+          <div className="px-4 md:px-6 pb-6">
             <button
               onClick={createNew}
               className="w-full mb-4 px-4 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
@@ -728,7 +694,7 @@ export default function AdminPage() {
         </div>
 
         {/* Футер сайдбара */}
-        <div className="p-6 border-t border-black/10 dark:border-white/10">
+        <div className="p-4 md:p-6 border-t border-black/10 dark:border-white/10">
           <button
             onClick={() => {
               localStorage.removeItem("auth");
@@ -1090,16 +1056,17 @@ MIT
         )}
 
         {/* Контент */}
-        <div className={`${isFullscreen ? 'h-screen p-8' : 'p-6 md:p-8 lg:p-10'}`}>
+        <div className={`${isFullscreen ? 'h-screen p-4 md:p-8' : getContentPadding()}`}>
           {selected ? (
             // Режим редактирования
-            <div className={`${isFullscreen ? 'h-full max-w-7xl mx-auto' : 'max-w-4xl mx-auto space-y-6'}`}>
+            <div className={`${isFullscreen ? 'h-full mx-auto' : 'mx-auto space-y-6'}`}
+                 style={{ maxWidth: isFullscreen ? '100%' : getEditorMaxWidth() }}>
               {!isFullscreen && (
                 <div>
-                  <h1 className="text-2xl font-light text-black/80 dark:text-white/80 mb-1">
+                  <h1 className="text-xl md:text-2xl font-light text-black/80 dark:text-white/80 mb-1">
                     Редактирование
                   </h1>
-                  <p className="text-sm text-black/40 dark:text-white/40">
+                  <p className="text-xs md:text-sm text-black/40 dark:text-white/40 break-all">
                     {selected}
                   </p>
                 </div>
@@ -1112,8 +1079,8 @@ MIT
                     <div className="w-10 h-10 bg-black/5 dark:bg-white/5 rounded-xl flex items-center justify-center">
                       <span className="text-xl">📝</span>
                     </div>
-                    <div>
-                      <h2 className="text-lg font-medium text-black/80 dark:text-white/80">
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-base md:text-lg font-medium text-black/80 dark:text-white/80 truncate">
                         {selected}
                       </h2>
                       <p className="text-xs text-black/40 dark:text-white/40">
@@ -1121,24 +1088,17 @@ MIT
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <button
                       onClick={() => setShowMediaManager(true)}
-                      className="px-4 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-xl text-sm transition-colors flex items-center gap-2"
+                      className="px-3 md:px-4 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-xl text-xs md:text-sm transition-colors flex items-center gap-1 md:gap-2"
                     >
                       <span>🖼️</span>
                       <span className="hidden sm:inline">Медиа</span>
                     </button>
                     <button
-                      onClick={() => setShowVersionHistory(true)}
-                      className="px-4 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-xl text-sm transition-colors flex items-center gap-2"
-                    >
-                      <span>📋</span>
-                      <span className="hidden sm:inline">История</span>
-                    </button>
-                    <button
                       onClick={toggleFullscreen}
-                      className="px-4 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-xl text-sm transition-colors flex items-center gap-2"
+                      className="px-3 md:px-4 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-xl text-xs md:text-sm transition-colors flex items-center gap-1 md:gap-2"
                     >
                       <span>✕</span>
                       <span className="hidden sm:inline">Свернуть</span>
@@ -1155,7 +1115,7 @@ MIT
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       placeholder="Заголовок"
-                      className="w-full px-4 py-3 bg-black/5 dark:bg-white/5 border border-transparent focus:border-black/20 dark:focus:border-white/20 rounded-lg text-lg transition-colors placeholder:text-black/30 dark:placeholder:text-white/30"
+                      className="w-full px-4 py-2 md:px-4 md:py-3 bg-black/5 dark:bg-white/5 border border-transparent focus:border-black/20 dark:focus:border-white/20 rounded-lg text-base md:text-lg transition-colors placeholder:text-black/30 dark:placeholder:text-white/30"
                     />
 
                     <input
@@ -1163,7 +1123,7 @@ MIT
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       placeholder="Описание"
-                      className="w-full px-4 py-3 bg-black/5 dark:bg-white/5 border border-transparent focus:border-black/20 dark:focus:border-white/20 rounded-lg transition-colors placeholder:text-black/30 dark:placeholder:text-white/30"
+                      className="w-full px-4 py-2 md:px-4 md:py-3 bg-black/5 dark:bg-white/5 border border-transparent focus:border-black/20 dark:focus:border-white/20 rounded-lg text-sm md:text-base transition-colors placeholder:text-black/30 dark:placeholder:text-white/30"
                     />
                   </>
                 )}
@@ -1174,39 +1134,24 @@ MIT
                   {!isFullscreen && (
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-black/40 dark:text-white/40">
+                        <span className="text-xs md:text-sm text-black/40 dark:text-white/40">
                           Редактор
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 md:gap-2">
                         <button
                           onClick={() => setShowMediaManager(true)}
-                          className="px-3 py-1.5 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg text-sm transition-colors flex items-center gap-1"
+                          className="px-2 md:px-3 py-1 md:py-1.5 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg text-xs md:text-sm transition-colors flex items-center gap-1"
                         >
-                          <span className="text-lg">🖼️</span>
+                          <span className="text-sm md:text-lg">🖼️</span>
                           <span className="hidden sm:inline">Медиа</span>
                         </button>
                         <button
-                          onClick={() => setShowVersionHistory(true)}
-                          className="px-3 py-1.5 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg text-sm transition-colors flex items-center gap-1"
-                        >
-                          <span className="text-lg">📋</span>
-                          <span className="hidden sm:inline">История</span>
-                        </button>
-                        <button
-                          onClick={() => setShowTocGenerator(true)}
-                          className="px-3 py-1.5 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg text-sm transition-colors flex items-center gap-1"
-                          title="Сгенерировать оглавление"
-                        >
-                          <span className="text-lg">📑</span>
-                          <span className="hidden sm:inline">TOC</span>
-                        </button>
-                        <button
                           onClick={toggleFullscreen}
-                          className="px-3 py-1.5 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg text-sm transition-colors flex items-center gap-1"
+                          className="px-2 md:px-3 py-1 md:py-1.5 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg text-xs md:text-sm transition-colors flex items-center gap-1"
                           title="На весь экран"
                         >
-                          <span className="text-lg">⛶</span>
+                          <span className="text-sm md:text-lg">⛶</span>
                           <span className="hidden sm:inline">На весь экран</span>
                         </button>
                       </div>
@@ -1236,30 +1181,31 @@ MIT
                         },
                       }}
                       style={{ 
-                        height: isFullscreen ? '100%' : (isMobile ? 400 : 550),
+                        height: isFullscreen ? '100%' : getEditorHeight(),
                         width: '100%',
                         maxHeight: isFullscreen ? 'calc(100vh - 120px)' : 'none',
+                        minHeight: isMobile ? 300 : 400,
                       }}
                     />
                   </div>
                 </div>
 
                 {/* Кнопки действий */}
-                <div className={`flex flex-wrap gap-3 ${isFullscreen ? 'mt-4' : 'pt-4'}`}>
+                <div className={`flex flex-wrap gap-2 md:gap-3 ${isFullscreen ? 'mt-4' : 'pt-4'}`}>
                   <button
                     onClick={saveFile}
                     disabled={isSaving}
-                    className="px-6 py-3 bg-black/90 dark:bg-white/90 text-white dark:text-black rounded-xl font-medium hover:bg-black dark:hover:bg-white transition-colors disabled:opacity-50 flex items-center gap-2 group shadow-lg"
+                    className="flex-1 min-w-[120px] px-4 md:px-6 py-2 md:py-3 bg-black/90 dark:bg-white/90 text-white dark:text-black rounded-lg md:rounded-xl text-xs md:text-sm font-medium hover:bg-black dark:hover:bg-white transition-colors disabled:opacity-50 flex items-center justify-center gap-1 md:gap-2 group shadow-lg"
                   >
                     {isSaving ? (
                       <>
-                        <div className="w-5 h-5 border-2 border-white/30 dark:border-black/30 border-t-white dark:border-t-black rounded-full animate-spin" />
-                        <span>Сохранение...</span>
+                        <div className="w-4 h-4 border-2 border-white/30 dark:border-black/30 border-t-white dark:border-t-black rounded-full animate-spin" />
+                        <span className="hidden xs:inline">Сохранение...</span>
                       </>
                     ) : (
                       <>
-                        <span className="text-lg group-hover:scale-110 transition-transform">💾</span>
-                        <span>Сохранить</span>
+                        <span className="text-base md:text-lg group-hover:scale-110 transition-transform">💾</span>
+                        <span className="hidden xs:inline">Сохранить</span>
                       </>
                     )}
                   </button>
@@ -1272,10 +1218,10 @@ MIT
                       setContent("");
                       if (isFullscreen) toggleFullscreen();
                     }}
-                    className="px-6 py-3 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-xl font-medium transition-colors flex items-center gap-2 group"
+                    className="flex-1 min-w-[80px] px-4 md:px-6 py-2 md:py-3 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg md:rounded-xl text-xs md:text-sm font-medium transition-colors flex items-center justify-center gap-1 md:gap-2 group"
                   >
-                    <span className="text-lg group-hover:scale-110 transition-transform">✕</span>
-                    <span>Отмена</span>
+                    <span className="text-base md:text-lg group-hover:scale-110 transition-transform">✕</span>
+                    <span className="hidden xs:inline">Отмена</span>
                   </button>
                 </div>
               </div>
@@ -1293,47 +1239,47 @@ MIT
             </div>
           ) : (
             // Аналитика и шаблоны
-            <div className="max-w-6xl mx-auto space-y-12">
+            <div className="max-w-7xl xl:max-w-[1800px] 2xl:max-w-[2200px] mx-auto space-y-8 md:space-y-12">
               {/* Аналитика - сверху */}
-              <div className="space-y-8">
-                <h2 className="text-xl font-light text-black/80 dark:text-white/80">
+              <div className="space-y-6 md:space-y-8">
+                <h2 className="text-lg md:text-xl font-light text-black/80 dark:text-white/80">
                   Статистика
                 </h2>
                 
-                {/* Основные показатели */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="p-4 bg-black/5 dark:bg-white/5 rounded-lg">
+                {/* Основные показатели - адаптивная сетка */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
+                  <div className="p-3 md:p-4 bg-black/5 dark:bg-white/5 rounded-lg">
                     <p className="text-xs text-black/40 dark:text-white/40 mb-1">
                       Всего документов
                     </p>
-                    <p className="text-3xl font-light text-black/80 dark:text-white/80">
+                    <p className="text-xl md:text-2xl lg:text-3xl font-light text-black/80 dark:text-white/80">
                       {analytics.totalDocs}
                     </p>
                   </div>
                   
-                  <div className="p-4 bg-black/5 dark:bg-white/5 rounded-lg">
+                  <div className="p-3 md:p-4 bg-black/5 dark:bg-white/5 rounded-lg">
                     <p className="text-xs text-black/40 dark:text-white/40 mb-1">
                       Папок
                     </p>
-                    <p className="text-3xl font-light text-black/80 dark:text-white/80">
+                    <p className="text-xl md:text-2xl lg:text-3xl font-light text-black/80 dark:text-white/80">
                       {analytics.totalFolders}
                     </p>
                   </div>
                   
-                  <div className="p-4 bg-black/5 dark:bg-white/5 rounded-lg">
+                  <div className="p-3 md:p-4 bg-black/5 dark:bg-white/5 rounded-lg">
                     <p className="text-xs text-black/40 dark:text-white/40 mb-1">
                       В корне
                     </p>
-                    <p className="text-3xl font-light text-black/80 dark:text-white/80">
+                    <p className="text-xl md:text-2xl lg:text-3xl font-light text-black/80 dark:text-white/80">
                       {files.filter(f => !f.folder).length}
                     </p>
                   </div>
                   
-                  <div className="p-4 bg-black/5 dark:bg-white/5 rounded-lg">
+                  <div className="p-3 md:p-4 bg-black/5 dark:bg-white/5 rounded-lg">
                     <p className="text-xs text-black/40 dark:text-white/40 mb-1">
                       В папках
                     </p>
-                    <p className="text-3xl font-light text-black/80 dark:text-white/80">
+                    <p className="text-xl md:text-2xl lg:text-3xl font-light text-black/80 dark:text-white/80">
                       {files.filter(f => f.folder).length}
                     </p>
                   </div>
@@ -1341,19 +1287,19 @@ MIT
 
                 {/* Активность за неделю */}
                 <div>
-                  <h3 className="text-sm font-medium text-black/60 dark:text-white/60 mb-4">
+                  <h3 className="text-xs md:text-sm font-medium text-black/60 dark:text-white/60 mb-3 md:mb-4">
                     Активность за неделю
                   </h3>
-                  <div className="flex items-end justify-between gap-2 h-32">
+                  <div className="flex items-end justify-between gap-1 md:gap-2 h-24 md:h-32">
                     {analytics.activityLastWeek.map((day, i) => (
-                      <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                        <div className="w-full bg-black/5 dark:bg-white/5 rounded-t relative h-24">
+                      <div key={i} className="flex-1 flex flex-col items-center gap-1 md:gap-2">
+                        <div className="w-full bg-black/5 dark:bg-white/5 rounded-t relative h-16 md:h-24">
                           <div 
                             className="absolute bottom-0 left-0 right-0 bg-black/30 dark:bg-white/30 rounded-t transition-all duration-500"
                             style={{ height: `${Math.min(100, day.count * 20)}%` }}
                           />
                         </div>
-                        <span className="text-xs text-black/40 dark:text-white/40">
+                        <span className="text-[8px] md:text-xs text-black/40 dark:text-white/40 rotate-45 md:rotate-0 origin-left md:origin-center">
                           {formatDate(day.date)}
                         </span>
                       </div>
@@ -1364,16 +1310,16 @@ MIT
                 {/* Документы по папкам */}
                 {analytics.docsByFolder.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-medium text-black/60 dark:text-white/60 mb-4">
+                    <h3 className="text-xs md:text-sm font-medium text-black/60 dark:text-white/60 mb-3 md:mb-4">
                       Документы по папкам
                     </h3>
                     <div className="space-y-2">
                       {analytics.docsByFolder.map((item, i) => (
-                        <div key={i} className="flex items-center gap-3">
-                          <span className="text-xs text-black/40 dark:text-white/40 w-24 truncate">
+                        <div key={i} className="flex items-center gap-2 md:gap-3">
+                          <span className="text-xs text-black/40 dark:text-white/40 w-16 md:w-24 truncate">
                             {item.folder === 'root' ? 'Корень' : item.folder}
                           </span>
-                          <div className="flex-1 h-6 bg-black/5 dark:bg-white/5 rounded-full overflow-hidden">
+                          <div className="flex-1 h-4 md:h-6 bg-black/5 dark:bg-white/5 rounded-full overflow-hidden">
                             <div 
                               className="h-full bg-black/30 dark:bg-white/30 transition-all duration-500"
                               style={{ width: `${(item.count / analytics.totalDocs) * 100}%` }}
@@ -1391,28 +1337,28 @@ MIT
                 {/* Последние документы */}
                 {analytics.recentDocs.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-medium text-black/60 dark:text-white/60 mb-4">
+                    <h3 className="text-xs md:text-sm font-medium text-black/60 dark:text-white/60 mb-3 md:mb-4">
                       Последние изменения
                     </h3>
-                    <div className="space-y-2">
+                    <div className="space-y-1 md:space-y-2">
                       {analytics.recentDocs.map((doc, i) => (
                         <button
                           key={i}
                           onClick={() => loadFile(doc.path)}
-                          className="w-full flex items-center justify-between p-3 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors group"
+                          className="w-full flex items-center justify-between p-2 md:p-3 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors group"
                         >
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm text-black/40 dark:text-white/40">📄</span>
-                            <div className="text-left">
-                              <p className="text-sm text-black/80 dark:text-white/80">
+                          <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+                            <span className="text-base md:text-lg text-black/40 dark:text-white/40 flex-shrink-0">📄</span>
+                            <div className="text-left min-w-0 flex-1">
+                              <p className="text-xs md:text-sm text-black/80 dark:text-white/80 truncate">
                                 {doc.title}
                               </p>
-                              <p className="text-xs text-black/40 dark:text-white/40">
+                              <p className="text-[10px] md:text-xs text-black/40 dark:text-white/40 truncate">
                                 {doc.folder || 'Корень'}
                               </p>
                             </div>
                           </div>
-                          <span className="text-xs text-black/30 dark:text-white/30 group-hover:text-black/50 dark:group-hover:text-white/50">
+                          <span className="text-[10px] md:text-xs text-black/30 dark:text-white/30 group-hover:text-black/50 dark:group-hover:text-white/50 flex-shrink-0">
                             {doc.lastModified}
                           </span>
                         </button>
@@ -1423,22 +1369,22 @@ MIT
               </div>
 
               {/* Быстрые шаблоны - снизу с разделителем */}
-              <div className="hidden md:block pt-8 border-t border-black/10 dark:border-white/10">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-light text-black/80 dark:text-white/80">
+              <div className="hidden md:block pt-6 md:pt-8 border-t border-black/10 dark:border-white/10">
+                <div className="flex items-center justify-between mb-4 md:mb-6">
+                  <h2 className="text-lg md:text-xl font-light text-black/80 dark:text-white/80">
                     Быстрые шаблоны
                   </h2>
                   <button
                     onClick={() => setShowTemplates(true)}
-                    className="text-sm text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors flex items-center gap-1"
+                    className="text-xs md:text-sm text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors flex items-center gap-1"
                   >
                     <span>Все шаблоны</span>
                     <span>→</span>
                   </button>
                 </div>
 
-                {/* Сетка шаблонов */}
-                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {/* Сетка шаблонов - максимально широкая */}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-4">
                   {/* API Документация */}
                   <button
                     onClick={() => {
@@ -1502,23 +1448,23 @@ Authorization: Bearer YOUR_API_KEY
 `);
                       }
                     }}
-                    className="group relative p-6 bg-white dark:bg-black/50 border border-black/10 dark:border-white/10 rounded-2xl hover:border-black/30 dark:hover:border-white/30 transition-all duration-300 text-left hover:shadow-lg hover:-translate-y-1"
+                    className="group relative p-3 md:p-4 lg:p-5 xl:p-6 bg-white dark:bg-black/50 border border-black/10 dark:border-white/10 rounded-xl md:rounded-2xl hover:border-black/30 dark:hover:border-white/30 transition-all duration-300 text-left hover:shadow-lg hover:-translate-y-1"
                   >
-                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span className="text-xs text-black/40 dark:text-white/40">использовать →</span>
+                    <div className="absolute top-2 right-2 md:top-4 md:right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-[10px] md:text-xs text-black/40 dark:text-white/40">использовать →</span>
                     </div>
-                    <div className="text-3xl mb-3">📡</div>
-                    <h3 className="text-base font-medium text-black/80 dark:text-white/80 mb-1">
+                    <div className="text-2xl md:text-3xl mb-2 md:mb-3">📡</div>
+                    <h3 className="text-sm md:text-base font-medium text-black/80 dark:text-white/80 mb-1">
                       API Документация
                     </h3>
-                    <p className="text-xs text-black/40 dark:text-white/40">
+                    <p className="text-[10px] md:text-xs text-black/40 dark:text-white/40 line-clamp-2">
                       Шаблон для описания API эндпоинтов
                     </p>
-                    <div className="mt-3 flex flex-wrap gap-1">
-                      <span className="px-2 py-0.5 bg-black/5 dark:bg-white/5 rounded-full text-[10px] text-black/60 dark:text-white/60">
+                    <div className="mt-2 md:mt-3 flex flex-wrap gap-1">
+                      <span className="px-1 md:px-2 py-0.5 bg-black/5 dark:bg-white/5 rounded-full text-[8px] md:text-[10px] text-black/60 dark:text-white/60">
                         REST API
                       </span>
-                      <span className="px-2 py-0.5 bg-black/5 dark:bg-white/5 rounded-full text-[10px] text-black/60 dark:text-white/60">
+                      <span className="px-1 md:px-2 py-0.5 bg-black/5 dark:bg-white/5 rounded-full text-[8px] md:text-[10px] text-black/60 dark:text-white/60">
                         эндпоинты
                       </span>
                     </div>
@@ -1575,23 +1521,23 @@ Authorization: Bearer YOUR_API_KEY
 `);
                       }
                     }}
-                    className="group relative p-6 bg-white dark:bg-black/50 border border-black/10 dark:border-white/10 rounded-2xl hover:border-black/30 dark:hover:border-white/30 transition-all duration-300 text-left hover:shadow-lg hover:-translate-y-1"
+                    className="group relative p-3 md:p-4 lg:p-5 xl:p-6 bg-white dark:bg-black/50 border border-black/10 dark:border-white/10 rounded-xl md:rounded-2xl hover:border-black/30 dark:hover:border-white/30 transition-all duration-300 text-left hover:shadow-lg hover:-translate-y-1"
                   >
-                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span className="text-xs text-black/40 dark:text-white/40">использовать →</span>
+                    <div className="absolute top-2 right-2 md:top-4 md:right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-[10px] md:text-xs text-black/40 dark:text-white/40">использовать →</span>
                     </div>
-                    <div className="text-3xl mb-3">📖</div>
-                    <h3 className="text-base font-medium text-black/80 dark:text-white/80 mb-1">
+                    <div className="text-2xl md:text-3xl mb-2 md:mb-3">📖</div>
+                    <h3 className="text-sm md:text-base font-medium text-black/80 dark:text-white/80 mb-1">
                       Руководство
                     </h3>
-                    <p className="text-xs text-black/40 dark:text-white/40">
+                    <p className="text-[10px] md:text-xs text-black/40 dark:text-white/40 line-clamp-2">
                       Пошаговое руководство пользователя
                     </p>
-                    <div className="mt-3 flex flex-wrap gap-1">
-                      <span className="px-2 py-0.5 bg-black/5 dark:bg-white/5 rounded-full text-[10px] text-black/60 dark:text-white/60">
+                    <div className="mt-2 md:mt-3 flex flex-wrap gap-1">
+                      <span className="px-1 md:px-2 py-0.5 bg-black/5 dark:bg-white/5 rounded-full text-[8px] md:text-[10px] text-black/60 dark:text-white/60">
                         инструкция
                       </span>
-                      <span className="px-2 py-0.5 bg-black/5 dark:bg-white/5 rounded-full text-[10px] text-black/60 dark:text-white/60">
+                      <span className="px-1 md:px-2 py-0.5 bg-black/5 dark:bg-white/5 rounded-full text-[8px] md:text-[10px] text-black/60 dark:text-white/60">
                         шаги
                       </span>
                     </div>
@@ -1674,23 +1620,23 @@ MIT
 `);
                       }
                     }}
-                    className="group relative p-6 bg-white dark:bg-black/50 border border-black/10 dark:border-white/10 rounded-2xl hover:border-black/30 dark:hover:border-white/30 transition-all duration-300 text-left hover:shadow-lg hover:-translate-y-1"
+                    className="group relative p-3 md:p-4 lg:p-5 xl:p-6 bg-white dark:bg-black/50 border border-black/10 dark:border-white/10 rounded-xl md:rounded-2xl hover:border-black/30 dark:hover:border-white/30 transition-all duration-300 text-left hover:shadow-lg hover:-translate-y-1"
                   >
-                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span className="text-xs text-black/40 dark:text-white/40">использовать →</span>
+                    <div className="absolute top-2 right-2 md:top-4 md:right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-[10px] md:text-xs text-black/40 dark:text-white/40">использовать →</span>
                     </div>
-                    <div className="text-3xl mb-3">📝</div>
-                    <h3 className="text-base font-medium text-black/80 dark:text-white/80 mb-1">
+                    <div className="text-2xl md:text-3xl mb-2 md:mb-3">📝</div>
+                    <h3 className="text-sm md:text-base font-medium text-black/80 dark:text-white/80 mb-1">
                       README
                     </h3>
-                    <p className="text-xs text-black/40 dark:text-white/40">
+                    <p className="text-[10px] md:text-xs text-black/40 dark:text-white/40 line-clamp-2">
                       Описание проекта для GitHub
                     </p>
-                    <div className="mt-3 flex flex-wrap gap-1">
-                      <span className="px-2 py-0.5 bg-black/5 dark:bg-white/5 rounded-full text-[10px] text-black/60 dark:text-white/60">
+                    <div className="mt-2 md:mt-3 flex flex-wrap gap-1">
+                      <span className="px-1 md:px-2 py-0.5 bg-black/5 dark:bg-white/5 rounded-full text-[8px] md:text-[10px] text-black/60 dark:text-white/60">
                         установка
                       </span>
-                      <span className="px-2 py-0.5 bg-black/5 dark:bg-white/5 rounded-full text-[10px] text-black/60 dark:text-white/60">
+                      <span className="px-1 md:px-2 py-0.5 bg-black/5 dark:bg-white/5 rounded-full text-[8px] md:text-[10px] text-black/60 dark:text-white/60">
                         команды
                       </span>
                     </div>
@@ -1740,23 +1686,23 @@ MIT
 `);
                       }
                     }}
-                    className="group relative p-6 bg-white dark:bg-black/50 border border-black/10 dark:border-white/10 rounded-2xl hover:border-black/30 dark:hover:border-white/30 transition-all duration-300 text-left hover:shadow-lg hover:-translate-y-1"
+                    className="group relative p-3 md:p-4 lg:p-5 xl:p-6 bg-white dark:bg-black/50 border border-black/10 dark:border-white/10 rounded-xl md:rounded-2xl hover:border-black/30 dark:hover:border-white/30 transition-all duration-300 text-left hover:shadow-lg hover:-translate-y-1"
                   >
-                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span className="text-xs text-black/40 dark:text-white/40">использовать →</span>
+                    <div className="absolute top-2 right-2 md:top-4 md:right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-[10px] md:text-xs text-black/40 dark:text-white/40">использовать →</span>
                     </div>
-                    <div className="text-3xl mb-3">📋</div>
-                    <h3 className="text-base font-medium text-black/80 dark:text-white/80 mb-1">
+                    <div className="text-2xl md:text-3xl mb-2 md:mb-3">📋</div>
+                    <h3 className="text-sm md:text-base font-medium text-black/80 dark:text-white/80 mb-1">
                       Changelog
                     </h3>
-                    <p className="text-xs text-black/40 dark:text-white/40">
+                    <p className="text-[10px] md:text-xs text-black/40 dark:text-white/40 line-clamp-2">
                       История версий и изменений
                     </p>
-                    <div className="mt-3 flex flex-wrap gap-1">
-                      <span className="px-2 py-0.5 bg-black/5 dark:bg-white/5 rounded-full text-[10px] text-black/60 dark:text-white/60">
+                    <div className="mt-2 md:mt-3 flex flex-wrap gap-1">
+                      <span className="px-1 md:px-2 py-0.5 bg-black/5 dark:bg-white/5 rounded-full text-[8px] md:text-[10px] text-black/60 dark:text-white/60">
                         версии
                       </span>
-                      <span className="px-2 py-0.5 bg-black/5 dark:bg-white/5 rounded-full text-[10px] text-black/60 dark:text-white/60">
+                      <span className="px-1 md:px-2 py-0.5 bg-black/5 dark:bg-white/5 rounded-full text-[8px] md:text-[10px] text-black/60 dark:text-white/60">
                         релизы
                       </span>
                     </div>
@@ -1776,60 +1722,30 @@ MIT
             onClick={handleCloseSaveModal}
           />
           
-          <div className="relative bg-white dark:bg-black rounded-2xl shadow-2xl max-w-md w-full p-8 border border-black/10 dark:border-white/10 animate-slideUp">
-            <div className="w-20 h-20 mx-auto mb-6 bg-black/10 dark:bg-white/10 rounded-full flex items-center justify-center">
-              <div className="w-16 h-16 bg-black/90 dark:bg-white/90 rounded-full flex items-center justify-center text-white dark:text-black text-4xl shadow-lg">
+          <div className="relative bg-white dark:bg-black rounded-2xl shadow-2xl w-full max-w-md p-6 md:p-8 border border-black/10 dark:border-white/10 animate-slideUp">
+            <div className="w-16 h-16 md:w-20 md:h-20 mx-auto mb-4 md:mb-6 bg-black/10 dark:bg-white/10 rounded-full flex items-center justify-center">
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-black/90 dark:bg-white/90 rounded-full flex items-center justify-center text-white dark:text-black text-2xl md:text-4xl shadow-lg">
                 ✓
               </div>
             </div>
             
-            <h3 className="text-2xl font-light text-center text-black/80 dark:text-white/80 mb-2">
+            <h3 className="text-xl md:text-2xl font-light text-center text-black/80 dark:text-white/80 mb-2">
               Изменения сохранены
             </h3>
             
-            <p className="text-center text-black/50 dark:text-white/50 mb-8">
+            <p className="text-sm md:text-base text-center text-black/50 dark:text-white/50 mb-6 md:mb-8">
               Документ успешно обновлен
             </p>
             
             <button
               onClick={handleCloseSaveModal}
-              className="w-full px-6 py-4 bg-black/90 dark:bg-white/90 text-white dark:text-black rounded-xl font-medium hover:bg-black dark:hover:bg-white transition-all duration-300 flex items-center justify-center gap-2 group"
+              className="w-full px-4 md:px-6 py-3 md:py-4 bg-black/90 dark:bg-white/90 text-white dark:text-black rounded-lg md:rounded-xl text-sm md:text-base font-medium hover:bg-black dark:hover:bg-white transition-all duration-300 flex items-center justify-center gap-2 group"
             >
               <span>Вернуться к аналитике</span>
-              <span className="text-lg group-hover:translate-x-1 transition-transform">→</span>
+              <span className="text-base md:text-lg group-hover:translate-x-1 transition-transform">→</span>
             </button>
           </div>
         </div>
-      )}
-
-      {/* Модальное окно истории версий */}
-      {showVersionHistory && selected && (
-        <VersionHistory
-          filename={selected}
-          onRestore={handleRestoreVersion}
-          onClose={() => setShowVersionHistory(false)}
-        />
-      )}
-
-      {/* Модальное окно массовых операций */}
-      {showBulkOperations && (
-        <BulkOperations
-          selectedDocs={selectedDocs}
-          folders={folders}
-          onClose={() => setShowBulkOperations(false)}
-          onMove={handleBulkMove}
-          onDelete={handleBulkDelete}
-          onExport={handleBulkExport}
-        />
-      )}
-
-      {/* Модальное окно генератора оглавления */}
-      {showTocGenerator && selected && (
-        <TocGenerator
-          content={content}
-          onInsert={handleInsertToc}
-          onClose={() => setShowTocGenerator(false)}
-        />
       )}
 
       {/* Модальное окно создания файла */}
@@ -1856,9 +1772,9 @@ MIT
 
       {/* Подсказка о горячих клавишах (только для сохранения) */}
       {selected && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 px-4 py-2 bg-black/80 dark:bg-white/80 text-white dark:text-black rounded-full text-sm shadow-lg backdrop-blur-sm">
-          <span className="flex items-center gap-1">
-            <span className="px-1.5 py-0.5 bg-white/20 dark:bg-black/20 rounded text-xs">⌘S</span>
+        <div className="fixed bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 z-40 px-3 md:px-4 py-1.5 md:py-2 bg-black/80 dark:bg-white/80 text-white dark:text-black rounded-full text-xs md:text-sm shadow-lg backdrop-blur-sm">
+          <span className="flex items-center gap-1 md:gap-2">
+            <span className="px-1 py-0.5 bg-white/20 dark:bg-black/20 rounded text-[8px] md:text-xs">⌘S</span>
             <span>Сохранить</span>
           </span>
         </div>
